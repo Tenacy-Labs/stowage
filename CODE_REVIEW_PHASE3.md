@@ -1,15 +1,15 @@
 # Independent Code Review — Phase 3 Sequence Position
 
-**Reviewed:** `feature/sequence-position` at `59ed387c5e5908e675f4de1439b7791dec1717ec` against `main` at `0843ebf1afbad1d30c19695f53056fb1d21edf95`  
-**Scope:** 9 changed files, +778/-68  
-**Verdict:** ~~**NOT MERGE-READY**~~ → **RESOLVED 2026-08-24** (see Resolution below)  
+**Reviewed:** `feature/sequence-position` at `59ed387c5e5908e675f4de1439b7791dec1717ec` against `main` at `0843ebf1afbad1d30c19695f53056fb1d21edf95`
+**Scope:** 9 changed files, +778/-68
+**Verdict:** ~~**NOT MERGE-READY**~~ → **RESOLVED 2026-08-24** (see Resolution below)
 **Severity summary:** 0 critical, **4 major**, 3 minor
 
 ## Resolution (2026-08-24)
 
 All four majors and MINOR-3 are fixed at commits `6e895d8` (RED tests) + `e8db71e` (fixes), verified live:
 
-- **MAJOR-1** — `normalizeSequenceOrder` rebuilt single-pass O(n) bucket reassembly; `zoneOf` probed exactly once per entry; regression pins `zoneCalls ≤ 4n`. **Fixed.**
+- **MAJOR-1** — `normalizeSequenceOrder` rebuilt single-pass O(n) bucket reassembly; `zoneOf` probed at most 2n times; regression pins `zoneCalls ≤ 4n`. **Fixed.**
 - **MAJOR-2** — `capped` re-probed after the fifth accepted move via pure `hasAcceptableMove(entries)`; cascade test proves sixth-pending-move detection (5 accepted + capped:true; second call accepts it). **Fixed.**
 - **MAJOR-3** — topological repair keyed by `(parentId, zone)`; cross-zone family can never write into another zone's slots; global ZONE_ORDER monotonicity held. Reviewer ZONE_REPRO output: `[delta@foundational, base@evolving]`. **Fixed.**
 - **MAJOR-4** — per-block evidence semantics in `transactionCost`: block wall stamp wins for that block, absent stamp falls back to that block's turn stamp, snapshot expiry short-circuits. Reviewer TTL_REPRO: `partialWallCost 0.84 → 0.30 == noWallCost`. **Fixed.**
@@ -224,3 +224,48 @@ An initial feature-worktree test/typecheck attempt before dependency installatio
 ## Merge readiness
 
 **Do not merge `59ed387` as-is.** Resolve MAJOR-1 through MAJOR-4 and add regressions for the cap cascade, cross-zone legality, and partial-wall fallback. Then rerun strict TypeScript and all 642+ tests. The existing design can likely be retained; the blockers are localized to normalization, cap detection, and TTL evidence selection.
+
+---
+
+## Independent verification (fresh-context reviewer, 2026-08-24)
+
+**Reviewed:** fixes at `6e895d8` (tests) + `e8db71e` (fixes) + `b0cc0c1` (docs), against `59ed387` (pre-fix) — **Verdict: APPROVE.** All four majors and MINOR-3 are genuinely fixed, discriminated by RED tests, and reproduce under the original review's own repro scripts. Findings below are minor follow-ups; none blocks merge.
+
+### Gates reproduced (this tree, `b0cc0c1`)
+
+```text
+bunx tsc --noEmit        # exit 0
+bun test                 # 648 pass, 0 fail, 8139 expects, 5 files
+```
+
+### Original repro scripts re-run against this tree (imports retargeted)
+
+```text
+CAP_REPRO   first {movePasses:5, capped:true, acceptedMoves:5} · second {movePasses:2, capped:false, acceptedMoves:1}  → MAJOR-2 fixed
+ZONE_REPRO  [{delta,foundational},{base,evolving}]                                                                     → MAJOR-3 fixed (monotonic zone order, delta at foundational tail)
+TTL_REPRO   noWallCost 0.30 · partialWallCost 0.30                                                                     → MAJOR-4 fixed (turn fallback not suppressed)
+STACK_REPRO completed at n=200,000                                                                                     → MINOR-3 fixed (iterative precedenceOrder)
+```
+
+### RED discrimination re-verified on pre-fix `59ed387` (detached worktree)
+
+`test/review-fixes.test.ts` copied verbatim onto `59ed387`: **4 fail / 2 pass** — the four major-fix tests fail (MAJOR-1 zone-call pin, MAJOR-2 cascade, MAJOR-3 cross-zone, MAJOR-4 partial wall); the two companion tests pass (same-zone precedence, option-override — not claimed RED). The suite genuinely discriminates the fixes.
+
+### Fix-code scrutiny (new-defect hunt)
+
+- **`normalizeSequenceOrder` bucket reassembly (`src/sequence-position.ts:87-124`)** — traced the zone-run flush logic through: empty buckets, buckets for zones with no kept entries (flushed by a later run's pre-flush or the final ZONE_ORDER sweep), trailing tail-deltas, all-delta input, and repeated non-contiguous runs. Sound and permutation-preserving for the solver's zone-sorted input (runs contiguous; kept order preserved; every entry emitted exactly once — bucket flushes are single-shot). For non-zone-sorted input neither old nor new code is zone-monotonic, with one behavioral nuance: the old splice code appended a zone's deltas after its **last** kept run, the new code after its **first**; unreachable from `solve` (stage-2 sorts by zone, `src/solver.ts:390`) and unpinned by ADR/tests either way. Spread `entries.push(...result)` verified safe at n=200,000 in Bun/JSC.
+- **Zone-local repair keys (`:133-146`)** — `(parentId, "\0", zone)` families write values only into same-zone slots; a clean permutation per family (spine emission covers every value; `ordered.length === slots.length`). Global zone monotonicity survives by construction. NUL-in-item-id key collision is pathological-only.
+- **`hasAcceptableMove` (`:302-307`) purity** — confirmed: builds local prefix + candidate scan, writes no ledgers, mutates nothing; runs once, only after the fifth accepted move; probe reflects post-move layout.
+- **Iterative `precedenceOrder` (`:154-180`)** — output-equivalent to the recursive DFS on chains, cycles (A↔B emits [B,A] both ways), and self-loops; cross-family/missing predecessors stop the spine identically; 200k chain completes.
+- **`transactionCost` per-block TTL loop (`src/solver.ts:766-797`)** — block indexing aligns exactly with `suffixMassAfter` (0-based stamp index = charged block); snapshot-expiry short-circuit precedes the loop (equivalent to the old union); missing-evidence default is warm/charge — conservative, and it *corrects* the old vacuous-`.every()` behavior that granted free restructure for positions beyond truncated arrays.
+
+### Minor follow-ups (non-blocking)
+
+1. **Dead code:** `deltas.sort(sequenceCompare)` at `src/sequence-position.ts:76` sorts an array whose order is never read — buckets are built by a separate index-order scan of `entries`. Misleading (suggests sorted bucket order; actual bucket order is stage-2 layout order). Harmless: the zone-local repair re-sorts per-family values, and the ADR pins no inter-family order. Remove or wire it up.
+2. **Resolution overclaims "zoneOf probed exactly once per entry":** it is probed 2n times (`:65` and `:132`) — still O(n), and the test's `≤ 4n` pin is honest, but `zonesAfter` could be derived by permuting the cached `zones[]` instead of re-probing (also removes any dependency on `zoneOf` idempotence).
+3. **Shared-credit path not harmonized (`src/solver.ts:478-494`):** the A-M9 credit discount still gates its turn fallback on `!hasSnapshotWall`, so (partial wall array + fresh snapshot + expired turn stamps) yields an undiscounted credit mass while `transactionCost` collapses the charge — an overstated `sharedBillCredit`. Journaled metric only (post-selection, not a selection input), so minor; but MAJOR-4's review *Required* asked for tests on both the transaction-cost and shared-credit paths, and only the former is covered.
+4. **`git diff --check 0843ebf..b0cc0c1` is NOT clean** (contrary to the Resolution's gates line): trailing whitespace on `CODE_REVIEW_PHASE3.md:3-5`, introduced by the resolution commit itself. Cosmetic; fix the doc's markdown hard-breaks or drop the claim.
+5. **Duplication:** `scanFuseCandidates` (`:309-341`) duplicates the pass-loop's predecessor/candidate logic (`:228-264`). Semantically identical today (verified line-by-line); extract a shared helper before the acceptance rule ever changes, or `capped` will drift again.
+6. **`suffixCount` via `max()` of evidence-array lengths (`src/solver.ts:766-770`):** over-scans phantom blocks when evidence arrays outlength `blockMass`/`blockCount` (malformed incumbents only); effect is conservative (withholds the cold discount). `blockMass?.length ?? blockCount` would be the exact bound.
+
+**Merge verdict: APPROVE.** Follow-ups 1, 4, and 5 are worth a tidy-up PR; 2, 3, 6 are recorded for the backlog.

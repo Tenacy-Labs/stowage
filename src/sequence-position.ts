@@ -59,7 +59,7 @@ export function normalizeSequenceOrder(
   entries: PositionEntry[],
   zoneOf: (entry: PositionEntry) => Zone,
 ): void {
-  // Single zoneOf pass: each entry's zone is computed exactly once
+  // zoneOf pass: each entry's zone computed at most twice (reassembly + repair)
   // (review MAJOR-1 — the previous repair probed zones Θ(n·d) times).
   const zones: Zone[] = new Array(entries.length);
   for (let i = 0; i < entries.length; i++) zones[i] = zoneOf(entries[i]!);
@@ -73,7 +73,6 @@ export function normalizeSequenceOrder(
     // stable partition keeps every non-delta in canonical order while
     // each tail-delta lands at its zone's tail. O(n) after one sort of
     // the deltas only.
-    deltas.sort(sequenceCompare);
     const buckets = new Map<Zone, PositionEntry[]>();
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i]!;
@@ -90,7 +89,7 @@ export function normalizeSequenceOrder(
     // AFTER that zone's last kept entry (the zone tail), and buckets for
     // zones with no kept entry flush at their ZONE_ORDER position. The
     // result is globally non-decreasing in ZONE_ORDER; zoneOf is probed
-    // exactly once per entry.
+    // at most twice per entry.
     const result: PositionEntry[] = [];
     const isTailDelta = (e: PositionEntry): boolean =>
       sequenceOf(e)?.role === "delta" && sequenceOf(e)?.placement !== "fuse";
