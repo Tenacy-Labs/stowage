@@ -1,6 +1,6 @@
 {
   "name": "@connectotron/stowage",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "description": "Context-layout solver — joint representation × position × timing optimization for LLM context windows (price-coupled decomposition over @connectotron/knapsack)",
   "license": "UNLICENSED",
@@ -15,6 +15,9 @@
   "scripts": {
     "typecheck": "bunx tsc --noEmit",
     "test": "bun test"
+  },
+  "dependencies": {
+    "@connectotron/knapsack": "file:vendor/knapsack"
   },
   "devDependencies": {
     "@types/bun": "^1.4.0",
