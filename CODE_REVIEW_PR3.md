@@ -65,3 +65,22 @@ So the wall is **not** confined to a "degenerate all-tied geometry" — genuinel
 - Differential gap: add over-capacity option weights to the randomized generator (weights up to ~1.5× cap) to cover the seed-guard branch; single-option groups and zero-weight options are already covered.
 - Pre-existing (out of scope, worth an issue): with a fully-populated incumbent, relief utilities can exceed the vendor's Int32 profit ceiling (`sum of per-group max profits ... got 132396507963` throws out of `solve()`).
 - SoA kernel itself: correct on 350 committed + 500 extended randomized + 6 adversarial shapes; ~1.13x on the tie-heavy shape.
+
+---
+
+## Resolution (author, 2026-08-24, round 2)
+
+All four required changes addressed; head now includes bounded relief mode (item 1 landed, not deferred):
+
+1. **relief-quantum test rebuilt** — engagement PROVEN by temporary instrumentation: `[RELIEF-FIRED groups=220]` (small-scale exact path) and `[RELIEF-FIRED groups=10000]` (full-window, 10k items / 1.5M content vs 900k budget). Key geometry the vacuous version missed: at 150 tokens/item utility > 0 so relief engages; at 1000 tokens/item reservation pricing rejects items in phase 1 (your −4.93 arithmetic, confirmed). 60s test timeout — the solve IS the measurement (bun's 5s default killed it on CI mid-run).
+2. **Claims corrected everywhere** — PR body rewritten; the "~20ms" number measured a solve where relief never engaged. The wall is yours: 7.6–12.9B cells / 36–38s on heterogeneous fresh content. Bounded mode is the landed answer (below).
+3. **bench/relief-dp.ts header** now documents the measured walls (27.6ms/8.6M → 1.68s/611M → 41.98s/15.2B; your 37s heterogeneous counterfactual) and the landed bounded-mode answer.
+4. **maxDpBytes forwarded** via `resolvedDpBudget` in solve.ts:144-148 — your reproduced throw is structurally impossible now (one budget resolves once, flows to both kernels).
+
+**Item 1 landed: bounded relief mode.** Above the 50 MiB DP budget the vendor returns the certified integral greedy incumbent (`greedyWalk` terminal state — feasible by construction, every hull index a real option) with honest `[greedyLower, lpUpper]` Dantzig bounds, status `"bounded"` — never claiming optimal. Stowage's `exactMckpRelief` passes `reliefMode: "bounded"`; below the budget the branch never engages (byte-identical exact path). Measured: ~1.6s (M4 Max) / ~10s (CI runner) at 10k groups / 900k capacity vs 37–42s+ exact. Bounded-mode engagement probe-verified: `[BOUNDED-FIRED groups=10000 cap=900000]`. Deterministic end to end (integer arithmetic; no floats in decisions).
+
+**Your non-blocking notes, taken:** differential gap (weights never exceeded capacity) — noted for the next test-strength pass; Int32 profit ceiling — filed for follow-up.
+
+**Operational finding worth the ledger:** `node_modules/@connectotron/knapsack` is a COPY, not a symlink — vendor edits require `bun install` to propagate. This silently invalidated the review round's small-window probe AND an intermediate test run on my side (tests passed against stale code). Countermeasure: `bun install` after every vendor edit, diff-verified.
+
+Gates: 655/655 (9,207 expects), tsc clean, CI green (run 32754857411).
