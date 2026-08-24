@@ -9,7 +9,8 @@ import { validateProblem } from "./validate.ts";
 import { reduceAll, convexHull } from "./dominance.ts";
 import { solveLp, greedyWalk } from "./lp.ts";
 import { fathomOptions } from "./fathom.ts";
-import { solveDp, DEFAULT_DP_BUDGET } from "./dp.ts";
+import { solveDp, DEFAULT_DP_BUDGET, expectedDpBytes } from "./dp.ts";
+import { solveDpSoa } from "./dp-soa.ts";
 
 /** Options for advanced callers. All optional. */
 export interface SolveOptions {
@@ -19,6 +20,24 @@ export interface SolveOptions {
    * divide-and-conquer mode instead (≤ 2× time, same results).
    */
   readonly maxDpBytes?: number;
+  /**
+   * DP kernel selection (2026-08-24, stowage perf item 2): "reference"
+   * (default) or "soa" — the structure-of-arrays kernel in dp-soa.ts.
+   * Same recurrence, tie-breaking, and outputs; differential-tested in
+   * stowage's test/dp-soa.test.ts. "soa" is exact; if the problem exceeds
+   * maxDpBytes the reference divide-and-conquer path is used regardless.
+   */
+  readonly dpKernel?: "reference" | "soa";
+  /**
+   * Bounded mode (2026-08-24, stowage perf item 1): "exact" (default) or
+   * "bounded". In bounded mode, when the exact DP table would exceed
+   * maxDpBytes, the certified integral greedy incumbent is returned with
+   * honest [greedyLower, lpUpper] bounds (status "bounded") instead of the
+   * O(capacity)-memory divide-and-conquer DP — which at full-window scale
+   * means O(groups x capacity) TIME (measured 37-42s at 10k groups / 1M
+   * capacity). Below the budget, behavior is identical to "exact".
+   */
+  readonly reliefMode?: "exact" | "bounded";
 }
 
 /**
@@ -129,7 +148,39 @@ export function solve(
   const optionsAfterFathoming = dpGroups.reduce((s, g) => s + g.options.length, 0);
 
   // 5. Exact DP.
-  const dp = solveDp(dpGroups, problem.capacity, options.maxDpBytes ?? DEFAULT_DP_BUDGET);
+  // Perf item 2 (2026-08-24): SoA kernel when it fits in back-pointer
+  // memory; the reference path (incl. divide-and-conquer above the budget)
+  // remains the default and the fallback.
+  const resolvedDpBudget = options.maxDpBytes ?? DEFAULT_DP_BUDGET;
+  // Bounded mode (2026-08-24, stowage perf item 1): when the exact DP table
+  // would exceed the memory budget — the divide-and-conquer fallback's 2x
+  // time is O(groups x capacity) at full-window scale (measured 7.6-15.2B
+  // cells, 37-42s at 10k groups / 1M capacity) — return the certified
+  // integral greedy incumbent instead. The Dantzig lpUpper brackets OPT
+  // from above; greedyLower (the walk incumbent) brackets from below. The
+  // selection is feasible by construction (every hull index is a real
+  // option) and honest: status "bounded", never "optimal".
+  if (options.reliefMode === "bounded" && expectedDpBytes(dpGroups.length, problem.capacity) > resolvedDpBudget) {
+    const walk = greedyWalk(dpGroups, problem.capacity);
+    const choices = extractChoices(dpGroups, walk.state.indices);
+    return {
+      status: "bounded",
+      value: walk.lowerBound,
+      choices,
+      bounds: { lpUpper: Math.max(lp.upperBound, walk.break.upperBound), greedyLower: walk.lowerBound },
+      stats: {
+        groups: pareto.length,
+        optionsTotal,
+        optionsAfterDominance,
+        optionsAfterFathoming: optionsAfterFathoming,
+        dpRequired: false,
+        dpCellsVisited: 0,
+      },
+    };
+  }
+  const dp = options.dpKernel === "soa" && expectedDpBytes(dpGroups.length, problem.capacity) <= resolvedDpBudget
+    ? solveDpSoa(dpGroups, problem.capacity, resolvedDpBudget)
+    : solveDp(dpGroups, problem.capacity, resolvedDpBudget);
   const choices = extractChoices(dpGroups, dp.choiceIndex);
 
   return {

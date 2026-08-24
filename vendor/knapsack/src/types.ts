@@ -53,8 +53,13 @@ export interface KnapsackResult {
    * 'optimal' — a proven-optimal selection is returned (either LP gap was zero,
    *   or the exact DP closed it).
    * 'infeasible' — no selection satisfies the capacity (min-weight sum exceeds it).
+   * 'bounded' — bounded-heuristic mode (2026-08-24): the exact DP would exceed
+   *   maxDpBytes, so the certified integral greedy incumbent is returned with
+   *   honest [greedyLower, lpUpper] bounds. NOT optimal: value is within the
+   *   reported interval of OPT, and the interval width is reported in bounds.
+   *   Deterministic (integer arithmetic end to end).
    */
-  readonly status: "optimal" | "infeasible";
+  readonly status: "optimal" | "infeasible" | "bounded";
   readonly value: number;
   readonly choices: readonly KnapsackChoice[] | null;
   readonly bounds: KnapsackBounds | null;

@@ -703,8 +703,18 @@ function exactMckpRelief(
     return { id: c.item.id, options: opts };
   });
 
-  const res = solveMckp({ groups, capacity });
-  if (res.status !== "optimal" || res.choices === null) return; // density loop is the fallback below
+  // Bounded relief (2026-08-24, perf item 1): below the vendor's 50 MiB DP
+  // budget this is byte-identical to exact (the bounded branch never
+  // engages). Above it — genuinely over-budget full windows, measured
+  // 7.6-15.2B DP cells / 37-42s in divide-and-conquer mode — the vendor
+  // returns the certified integral greedy incumbent with honest
+  // [greedyLower, lpUpper] bounds (status "bounded"), never "optimal".
+  const res = solveMckp({ groups, capacity }, { reliefMode: "bounded" });
+  if ((res.status !== "optimal" && res.status !== "bounded") || res.choices === null) {
+    return; // density loop is the fallback below
+  }
+  const reliefBounded = res.status === "bounded";
+  const reliefGap = reliefBounded && res.bounds !== null ? res.bounds.lpUpper - res.bounds.greedyLower : 0;
 
   const choiceById = new Map(res.choices.map((ch) => [ch.groupId, ch.optionId] as const));
   for (let i = chosen.length - 1; i >= 0; i--) {
