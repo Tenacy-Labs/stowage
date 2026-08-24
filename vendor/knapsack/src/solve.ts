@@ -9,7 +9,8 @@ import { validateProblem } from "./validate.ts";
 import { reduceAll, convexHull } from "./dominance.ts";
 import { solveLp, greedyWalk } from "./lp.ts";
 import { fathomOptions } from "./fathom.ts";
-import { solveDp, DEFAULT_DP_BUDGET } from "./dp.ts";
+import { solveDp, DEFAULT_DP_BUDGET, expectedDpBytes } from "./dp.ts";
+import { solveDpSoa } from "./dp-soa.ts";
 
 /** Options for advanced callers. All optional. */
 export interface SolveOptions {
@@ -19,6 +20,14 @@ export interface SolveOptions {
    * divide-and-conquer mode instead (≤ 2× time, same results).
    */
   readonly maxDpBytes?: number;
+  /**
+   * DP kernel selection (2026-08-24, stowage perf item 2): "reference"
+   * (default) or "soa" — the structure-of-arrays kernel in dp-soa.ts.
+   * Same recurrence, tie-breaking, and outputs; differential-tested in
+   * stowage's test/dp-soa.test.ts. "soa" is exact; if the problem exceeds
+   * maxDpBytes the reference divide-and-conquer path is used regardless.
+   */
+  readonly dpKernel?: "reference" | "soa";
 }
 
 /**
@@ -129,7 +138,12 @@ export function solve(
   const optionsAfterFathoming = dpGroups.reduce((s, g) => s + g.options.length, 0);
 
   // 5. Exact DP.
-  const dp = solveDp(dpGroups, problem.capacity, options.maxDpBytes ?? DEFAULT_DP_BUDGET);
+  // Perf item 2 (2026-08-24): SoA kernel when it fits in back-pointer
+  // memory; the reference path (incl. divide-and-conquer above the budget)
+  // remains the default and the fallback.
+  const dp = options.dpKernel === "soa" && expectedDpBytes(dpGroups.length, problem.capacity) <= (options.maxDpBytes ?? DEFAULT_DP_BUDGET)
+    ? solveDpSoa(dpGroups, problem.capacity)
+    : solveDp(dpGroups, problem.capacity, options.maxDpBytes ?? DEFAULT_DP_BUDGET);
   const choices = extractChoices(dpGroups, dp.choiceIndex);
 
   return {
