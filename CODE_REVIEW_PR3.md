@@ -84,3 +84,53 @@ All four required changes addressed; head now includes bounded relief mode (item
 **Operational finding worth the ledger:** `node_modules/@connectotron/knapsack` is a COPY, not a symlink — vendor edits require `bun install` to propagate. This silently invalidated the review round's small-window probe AND an intermediate test run on my side (tests passed against stale code). Countermeasure: `bun install` after every vendor edit, diff-verified.
 
 Gates: 655/655 (9,207 expects), tsc clean, CI green (run 32754857411).
+
+---
+
+## Round 2 verdict (reviewer)
+
+Fresh-context re-verification @ `ef05fcf` (bounded-mode commits + docs). Production code untouched; all probes spliced into `node_modules` copies or untracked scratch files, then reverted byte-identically (`diff -r vendor/knapsack node_modules/@connectotron/knapsack` → IDENTICAL after cleanup; final `git status` clean).
+
+### Gates (reproduced, pristine tree)
+
+- `bun install` first (the copy-sync hazard, item E): **node_modules ≡ vendor** (`diff -r` clean).
+- `bunx tsc --noEmit`: **exit 0**.
+- `bun test`: **655 pass / 0 fail, 9,207 expect() calls, 8 files** (3.4s). Matches PR claims exactly.
+- Staleness tripwire (E, bonus): a stale `node_modules` would silently drop `reliefMode:"bounded"` → exact path → the 10k test blows its 15s assertion. The test now catches the failure mode that bit both of us in round 1.
+
+### Round-1 required changes: all four genuinely resolved
+
+1. **relief test rebuilt — VERIFIED by my own independent probe** (counters spliced into the `node_modules` vendor `solve.ts` bounded branch + `src/solver.ts:712`, run, reverted): 220-group test → `[RELIEF-ENTER chosen=220]` → exact DP (`status=optimal`, 2,379,847 cells, 5.47MB table < 50MiB so bounded correctly does NOT engage); 10k test → `[BOUNDED-FIRED groups=10000 cap=900000]` → `status=bounded, value=greedyLower=28,924,300, lpUpper=28,925,887.32`, ~1.7s/solve on this host. The author's `[RELIEF-FIRED]`/`[BOUNDED-FIRED]` claims reproduce exactly. Both `exactMckpRelief` AND the bounded branch are genuinely reached.
+2. **Claims corrected** — PR body and comments now carry the 37–42s / 7.6–15.2B-cell walls; no ~20ms claim survives anywhere I looked.
+3. **bench/relief-dp.ts header accurate** — the measured walls (27.6ms/8.6M → 1.68s/611M → 41.98s/15.2B) match round-1's lineage including my own counterfactual numbers (85k / 4.7M cells for win-4k/win-30k), and the header honestly flags the win-1M run as a phase-1 fast path that does NOT fire relief. The "~1.6s bounded at 10k/900k" claim matches my measurement (~1.7s).
+4. **maxDpBytes forwarding — VERIFIED** (`vendor/knapsack/src/solve.ts:154`): `resolvedDpBudget` resolves once and flows to all three consumers — the bounded gate (:163), the SoA dispatch (:181), and `solveDp` (:183). Round-1's repro re-run on the fixed code: `solve(problem, {dpKernel:"soa", maxDpBytes:100MiB})` with expectedDpBytes ∈ (50MiB, 100MiB] now returns `optimal 623997` == reference kernel, no throw.
+
+### NEW REQUIRED finding R2-1: bounded-mode `lpUpper` does NOT bracket OPT
+
+`solve.ts:170` reports `bounds.lpUpper = walk.break.upperBound` from `greedyWalk(dpGroups, …)` — the **fathomed Pareto sets** — but the Dantzig break bound is only valid on **convex hulls**, where segment densities are strictly decreasing (the library's own `dominance.ts` `convexHull` doc states the walk depends on this). On a non-convex set, a below-the-chord "dent" segment is consumed early, the break lands with small slack on a low-density segment, and the reported "upper bound" falls **below OPT**.
+
+- **Clean-tree repro**: groups `A{(0,0),(60,30),(100,98)}`, `B{(0,0),(70,69)}`, capacity 100. Exact: `optimal 98` (hull `lpUpper` 98.4). Bounded: `lpUpper = 84 < OPT`; the certified interval `[69, 84]` excludes 98.
+- **Property probes** (5,000 random instances each, vendor API, `maxDpBytes:1` to force the branch):
+  - stowage's **exact relief option shape** (keep/evict/tombstone): **49 / 3,758** bounded instances violate bracketing (e.g. OPT 77,482 vs `lpUpper` 73,949.6).
+  - dent-heavy 3-option groups: **2,042 / 5,000** violations.
+- **Stowage does hit this shape**: `evict(0,0) / tomb(h,fv) / keep(w,u)` is non-convex whenever `fv·w < u·h` — a cheap tombstone under the keep chord.
+- **Impact today**: contained — `solver.ts:717`'s `reliefGap` is the only consumer of `bounds` and is itself a dead local (computed, never read), so no user-visible corruption in this PR. But the vendor contract is false as shipped: `types.ts:56-60` ("value is within the reported interval of OPT") and `solve.ts:159-162` ("The Dantzig lpUpper brackets OPT from above") — and honest certification is this mode's entire reason to exist.
+- **Fix (verified)**: `solve.ts:170` → `lpUpper: Math.max(lp.upperBound, walk.break.upperBound)` — the hull-based Dantzig bound is already computed at `solve.ts:78`. I patched exactly this line in `node_modules` and re-ran both property probes: **0 / 8,758 violations**. One line, no behavior change otherwise.
+
+### Bounded-mode correctness: everything else CHECKS OUT
+
+- **Incumbent feasible by construction**: `greedyWalk` starts at all-min weights (feasible; the min-weight infeasible case returned earlier at :80-95) and advances only when `weight + dw ≤ capacity`. Verified empirically — every probed bounded selection was feasible.
+- **`value` == the returned selection's profit**: Pareto-reduced groups are strictly increasing in weight AND profit, so walk profit is monotone; the final state IS the best-seen state (`lowerBound`). Verified.
+- **`extractChoices` index mapping correct**: `walk.state.indices` are positions in the array passed to `greedyWalk`; the bounded branch passes `dpGroups` to both `greedyWalk` (:164) and `extractChoices` (:165) — same-array consistency holds (unlike a hull/pareto mismatch).
+- **Status honest**: the branch returns `"bounded"`, never `"optimal"` (:167); `dpRequired:false`, `dpCellsVisited:0`.
+- **Cannot engage ≤ budget**: gate at :163 requires `expectedDpBytes > resolvedDpBudget`; the 220-group bounded-mode call ran the exact DP (5.47MB < 50MiB). Default (`reliefMode` undefined) can never enter the branch — byte-identical default path confirmed structurally and by the 220-group probe.
+
+### Non-blocking notes
+
+- `reliefGap` (solver.ts:717) is dead — either journal it (it was clearly meant for the ledger) or drop it; after R2-1's fix it would actually be meaningful.
+- 15s threshold: ~1.4× headroom over the author's CI measurement (10.4s) is thin for pooled runners; consider 20s or a documented skip env var if it flakes. The 60s test timeout is honest (the solve IS the measurement).
+- Round-1 non-blocking items (differential over-cap weights; Int32 profit ceiling) remain open by author agreement — fine.
+
+### Verdict: REQUEST CHANGES
+
+One required change: **R2-1** (`solve.ts:170`, one line, fix verified by this review). All four round-1 findings are genuinely and verifiably resolved; the bounded mode's incumbent, status, budget gate, and forwarding are correct — only the `lpUpper` bound semantics are broken, and the proven one-liner closes it.

@@ -167,7 +167,7 @@ export function solve(
       status: "bounded",
       value: walk.lowerBound,
       choices,
-      bounds: { lpUpper: walk.break.upperBound, greedyLower: walk.lowerBound },
+      bounds: { lpUpper: Math.max(lp.upperBound, walk.break.upperBound), greedyLower: walk.lowerBound },
       stats: {
         groups: pareto.length,
         optionsTotal,
