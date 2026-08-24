@@ -46,6 +46,15 @@ export interface KnapsackStats {
   readonly dpRequired: boolean;
   /** Inner-loop iterations executed by the DP (0 when skipped). */
   readonly dpCellsVisited: number;
+  /**
+   * Which DP kernel actually produced the result (2026-08-24, PR #5):
+   * "native" (compiled SIMD dylib), "soa" (TypeScript structure-of-arrays),
+   * "reference" (divide-and-conquer; explicit opt-out or above budget),
+   * "none" (no DP ran — LP-integral / infeasible / bounded early return).
+   * Default policy prefers native with automatic soa fallback, so this
+   * field is how a caller observes which path served the answer.
+   */
+  readonly dpKernelUsed?: "native" | "soa" | "reference" | "none";
 }
 
 export interface KnapsackResult {

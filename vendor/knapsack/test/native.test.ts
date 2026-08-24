@@ -161,3 +161,89 @@ describe("native SIMD kernel (spike 003 productionized)", () => {
   });
 
 });
+
+
+// PR #5: default dpKernel policy — prefer native, fall back to soa.
+// Host-agnostic by construction: a dylib host asserts "native"; an absent
+// dylib (CI linux x86_64) asserts the soa fallback. Outputs on the default
+// path must equal explicit "reference" outputs either way.
+
+function mulberry32(a: number) {
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function dpRequiredProblem(seed: number) {
+  const rnd = mulberry32(seed);
+  const groups = [];
+  for (let g = 0; g < 12; g++) {
+    const opts = [];
+    for (let o = 0; o < 4; o++) {
+      const w = [60, 150, 300, 500][o]! + Math.floor(rnd() * 20);
+      opts.push({ id: "o" + o, weight: w, profit: Math.floor(2.2 * w - 0.0028 * w * w + rnd() * 25) });
+    }
+    groups.push({ id: "g" + g, options: opts, originalCount: 4 });
+  }
+  return { groups, capacity: 900 };
+}
+
+describe("default dpKernel policy (PR #5)", () => {
+  test("default solve() prefers native when the dylib is present, soa otherwise", () => {
+    const problem = dpRequiredProblem(1);
+    const r = solve(problem);
+    expect(r.stats!.dpRequired).toBe(true);
+    if (nativeAvailable()) {
+      expect(r.stats!.dpKernelUsed).toBe("native");
+    } else {
+      expect(r.stats!.dpKernelUsed).toBe("soa");
+    }
+  });
+
+  test("forced-absent dylib: default solve() falls back to soa with identical outputs", () => {
+    const problem = dpRequiredProblem(2);
+    const env = { ...process.env, KNAPSACK_NATIVE_DYLIB: "/nonexistent/knapsack.dylib" };
+    process.env = env as Record<string, string>;
+    _resetNativeCache();
+    try {
+      const r = solve(problem);
+      const ref = solve(problem, { dpKernel: "reference" });
+      expect(r.stats!.dpKernelUsed).toBe("soa");
+      expect(r.value).toBe(ref.value);
+      expect(JSON.stringify(r.choices)).toBe(JSON.stringify(ref.choices));
+    } finally {
+      delete process.env.KNAPSACK_NATIVE_DYLIB;
+      _resetNativeCache();
+    }
+  });
+
+  test("explicit reference opt-out unchanged", () => {
+    const problem = dpRequiredProblem(3);
+    const r = solve(problem, { dpKernel: "reference" });
+    expect(r.stats!.dpKernelUsed).toBe("reference");
+  });
+
+  test("LP-integral problem: no DP runs, dpKernelUsed none", () => {
+    const groups = [
+      { id: "g0", options: [{ id: "a", weight: 10, profit: 100 }], originalCount: 1 },
+      { id: "g1", options: [{ id: "a", weight: 10, profit: 100 }], originalCount: 1 },
+    ];
+    const r = solve({ groups, capacity: 1000 });
+    expect(r.stats!.dpRequired).toBe(false);
+    expect(r.stats!.dpKernelUsed).toBe("none");
+  });
+
+  test("default-path outputs equal reference outputs across a sweep (host-agnostic)", () => {
+    for (let i = 0; i < 40; i++) {
+      const problem = dpRequiredProblem(100 + i);
+      const d = solve(problem);
+      const r = solve(problem, { dpKernel: "reference" });
+      if (d.value !== r.value || JSON.stringify(d.choices) !== JSON.stringify(r.choices)) {
+        throw new Error(`mismatch at ${i}: ${d.value} vs ${r.value}`);
+      }
+    }
+  });
+});
