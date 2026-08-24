@@ -22,8 +22,9 @@ x86_64 — never AVX assumptions).
 
 ## Verification
 
-- Loader `src/native.ts` dlopens `prebuilt/{triple}.dylib` matching the
-  host triple, `KNAPSACK_NATIVE_DYLIB` env override for testing.
+- Loader `src/native.ts` dlopens `prebuilt/{triple}{ext}` matching the
+  host triple (`.dylib` darwin, `.so` linux, `.dll` windows — see
+  `tripleFor`), `KNAPSACK_NATIVE_DYLIB` env override for testing.
 - Correctness: 500-problem differential vs `solveDpSoa` (value, weight,
   choices, cellsVisited) wherever a dylib is present; ran>0 guard.
 - rc conventions: 0 ok; −1 over budget; −2 infeasible; −3 invalid input
