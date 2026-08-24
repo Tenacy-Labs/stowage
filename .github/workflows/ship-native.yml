@@ -1,0 +1,71 @@
+name: ship-native
+
+# Wide native prebuilt matrix, owner ruling 2026-08-24: "build a wide
+# variety of native builds on ci/cd". Produces correctly-named artifacts
+# for vendor/knapsack/native/prebuilt/{triple}{ext} per the loader's
+# filename contract (native.ts tripleFor). The artifact-drop itself is a
+# reviewed PR (verification: local differential gates + PROVENANCE sha
+# pin); this workflow only builds and checksums on real CI hardware.
+#
+# Coverage: darwin arm64 (native) + darwin x64 (cross from arm64),
+# linux x64 (native) + linux arm64 (cross, gcc-aarch64-linux-gnu),
+# windows x64 (native MSVC). Workflow_dispatch only — matrix changes
+# never re-run host CI.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Pinned to match PROVENANCE.md (rustc 1.95.0, max-compat: no
+  # target-features — baseline ISA decides vector width).
+  RUSTFLAGS: ""
+
+jobs:
+  build:
+    name: build ${{ matrix.triple }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-15,      triple: aarch64-apple-darwin,       ext: .dylib, cross: false }
+          - { os: macos-15,      triple: x86_64-apple-darwin,        ext: .dylib, cross: true }
+          - { os: ubuntu-latest, triple: x86_64-unknown-linux-gnu,   ext: .so,    cross: false }
+          - { os: ubuntu-latest, triple: aarch64-unknown-linux-gnu,  ext: .so,    cross: true }
+          - { os: windows-latest, triple: x86_64-pc-windows-msvc,    ext: .dll,   cross: false }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (pinned)
+        uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          targets: ${{ matrix.cross && matrix.triple || '' }}
+
+      - name: Linux arm64 cross toolchain
+        if: matrix.triple == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+          echo 'CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc' >> "$GITHUB_ENV"
+
+      - name: Build
+        working-directory: vendor/knapsack/native
+        run: cargo build --release --target ${{ matrix.triple }}
+
+      # Rename to the loader's filename contract: {triple}{ext}.
+      - name: Stage artifact + checksum
+        working-directory: vendor/knapsack/native
+        shell: bash
+        run: |
+          mkdir -p staging
+          src="target/${{ matrix.triple }}/release/libknapsack_native${{ matrix.ext }}"
+          [ "${{ matrix.ext }}" = ".dll" ] && src="target/${{ matrix.triple }}/release/knapsack_native.dll"
+          cp "$src" "staging/${{ matrix.triple }}${{ matrix.ext }}"
+          cd staging && sha256sum * > SHA256SUMS && ls -la
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.triple }}
+          path: vendor/knapsack/native/staging/*
