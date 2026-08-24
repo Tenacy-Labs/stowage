@@ -35,8 +35,11 @@ export interface Incumbent {
   /** ADR-0006 §4: write turn per block (1-based position) — TTL-expiry
    *  windows collapse suffix terms to zero (free restructures). */
   blockWriteTurns?: readonly number[] | undefined;
-  /** Optional per-block wall-clock write stamps (milliseconds). */
-  blockWriteWallTimeMs?: readonly number[] | undefined;
+  /** Optional per-block wall-clock write stamps (milliseconds). Stamps may
+   *  be individually absent — partial wall evidence (review MAJOR-4): a
+   *  missing stamp must fall back to turn TTL for that block, never
+   *  globally suppress the turn axis. */
+  blockWriteWallTimeMs?: readonly (number | undefined)[] | undefined;
   /** Wall time of the cache snapshot when per-block stamps are unavailable. */
   cacheSnapshotWallTimeMs?: number | undefined;
   /** Prior accepted move by item, used for reversal/thrash diagnostics. */
@@ -756,25 +759,42 @@ function transactionCost(item: ContextItem, o: RenderOption, prev: PrevRender | 
   // exact per-block mass replaces the proportional share; a suffix whose
   // blocks are already TTL-expired (cold) collapses to zero.
   const own = (o.tokens / 1000) * cache.pricePer1kUncached;
-  const wallSnapshotExpired = cache.ttlMs !== undefined
-    && wallTimeMs !== undefined
-    && incumbent.cacheSnapshotWallTimeMs !== undefined
-    && wallTimeMs - incumbent.cacheSnapshotWallTimeMs > cache.ttlMs;
-  const wallBlocksExpired = cache.ttlMs !== undefined
-    && wallTimeMs !== undefined
-    && incumbent.blockWriteWallTimeMs !== undefined
-    && incumbent.blockWriteWallTimeMs.slice(prev.position)
-      .every((wt) => wt !== undefined && wallTimeMs - wt > cache.ttlMs!);
-  // Turn age is the fallback only when usable wall-clock evidence is absent.
-  const hasWallEvidence = wallTimeMs !== undefined && cache.ttlMs !== undefined
-    && (incumbent.cacheSnapshotWallTimeMs !== undefined || incumbent.blockWriteWallTimeMs !== undefined);
-  const turnExpired = !hasWallEvidence
-    && incumbent.blockWriteTurns !== undefined
-    && incumbent.blockWriteTurns.length > 0
-    && turn !== undefined
-    && incumbent.blockWriteTurns.slice(prev.position)
-      .every((wt) => wt !== undefined && turn - wt > cache.ttlTurns);
-  const expired = wallSnapshotExpired || wallBlocksExpired || turnExpired;
+  // Per-block freshness evidence (review MAJOR-4, 2026-08-24): decide
+  // wall-vs-turn per suffix block, never globally. A block with a usable
+  // wall stamp is judged by wall time; a block whose wall stamp is absent
+  // falls back to its turn stamp. The suffix is cold (free restructure)
+  // only when EVERY suffix block is expired under its own best evidence.
+  // The prior global hasWallEvidence let one partial wall array suppress
+  // the turn fallback for stamps it did not cover.
+  const suffixCount = Math.max(
+    (incumbent.blockWriteWallTimeMs?.length ?? 0),
+    (incumbent.blockWriteTurns?.length ?? 0),
+    incumbent.blockMass?.length ?? 0,
+  ) - prev.position;
+  let expired = true;
+  if (cache.ttlMs !== undefined && wallTimeMs !== undefined
+      && incumbent.cacheSnapshotWallTimeMs !== undefined
+      && wallTimeMs - incumbent.cacheSnapshotWallTimeMs > cache.ttlMs) {
+    return own; // whole-cache snapshot older than TTL: everything is cold
+  }
+  if (suffixCount <= 0) expired = false;
+  for (let i = prev.position; i < prev.position + suffixCount; i++) {
+    const wallStamp = incumbent.blockWriteWallTimeMs?.[i];
+    if (cache.ttlMs !== undefined && wallTimeMs !== undefined && wallStamp !== undefined) {
+      if (wallTimeMs - wallStamp > cache.ttlMs!) { continue; }
+      expired = false;
+      break;
+    }
+    const turnStamp = incumbent.blockWriteTurns?.[i];
+    if (turnStamp !== undefined && turn !== undefined) {
+      if (turn - turnStamp > cache.ttlTurns) { continue; }
+      expired = false;
+      break;
+    }
+    // No usable evidence for this block: treat as warm (charge the suffix).
+    expired = false;
+    break;
+  }
   if (expired) return own;   // free restructure: the suffix is already cold
   const tokensAfter = suffixMassAfter(incumbent, prev.position);
   const suffixCost = (tokensAfter / 1000) * (cache.pricePer1kUncached - cache.pricePer1kCached);

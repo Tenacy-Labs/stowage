@@ -1,4 +1,5 @@
 /** Deterministic phase-3 sequence-position placement (ADR-0001). */
+import { ZONE_ORDER } from "./types.ts";
 import type { ContextItem, ItemLedger, RenderOption, SequencePosition, Zone } from "./types.ts";
 
 export const MAX_MOVE_PASSES = 5;
@@ -58,36 +59,86 @@ export function normalizeSequenceOrder(
   entries: PositionEntry[],
   zoneOf: (entry: PositionEntry) => Zone,
 ): void {
+  // Single zoneOf pass: each entry's zone is computed exactly once
+  // (review MAJOR-1 — the previous repair probed zones Θ(n·d) times).
+  const zones: Zone[] = new Array(entries.length);
+  for (let i = 0; i < entries.length; i++) zones[i] = zoneOf(entries[i]!);
+
   const deltas = entries.filter((entry) => {
     const sequence = sequenceOf(entry);
     return sequence?.role === "delta" && sequence.placement !== "fuse";
   });
   if (deltas.length > 0) {
-    const deltaSet = new Set(deltas);
-    for (let i = entries.length - 1; i >= 0; i--) {
-      if (deltaSet.has(entries[i]!)) entries.splice(i, 1);
-    }
+    // Reassemble by buckets instead of per-delta splice scans: one
+    // stable partition keeps every non-delta in canonical order while
+    // each tail-delta lands at its zone's tail. O(n) after one sort of
+    // the deltas only.
     deltas.sort(sequenceCompare);
-    for (const delta of deltas) {
-      const zone = zoneOf(delta);
-      let target = entries.length;
-      for (let i = 0; i < entries.length; i++) {
-        if (zoneOf(entries[i]!) === zone) target = i + 1;
-      }
-      entries.splice(target, 0, delta);
+    const buckets = new Map<Zone, PositionEntry[]>();
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i]!;
+      const isDelta = sequenceOf(entry)?.role === "delta" && sequenceOf(entry)?.placement !== "fuse";
+      if (!isDelta) continue;
+      const zone = zones[i]!;
+      const bucket = buckets.get(zone) ?? [];
+      bucket.push(entry);
+      buckets.set(zone, bucket);
     }
+    // Canonical zone-order rebuild (review MAJOR-1 + MAJOR-3): one O(n)
+    // reassembly. Kept (non-tail-delta) entries preserve stage-2 relative
+    // order in contiguous zone runs; each zone's tail-delta bucket appends
+    // AFTER that zone's last kept entry (the zone tail), and buckets for
+    // zones with no kept entry flush at their ZONE_ORDER position. The
+    // result is globally non-decreasing in ZONE_ORDER; zoneOf is probed
+    // exactly once per entry.
+    const result: PositionEntry[] = [];
+    const isTailDelta = (e: PositionEntry): boolean =>
+      sequenceOf(e)?.role === "delta" && sequenceOf(e)?.placement !== "fuse";
+    let i = 0;
+    while (i < entries.length) {
+      if (isTailDelta(entries[i]!)) { i += 1; continue; }
+      const zone = zones[i]!;
+      const zoneIdx = ZONE_ORDER.indexOf(zone);
+      const run: PositionEntry[] = [];
+      while (i < entries.length) {
+        if (isTailDelta(entries[i]!)) { i += 1; continue; }
+        if (zones[i] !== zone) break;
+        run.push(entries[i]!);
+        i += 1;
+      }
+      for (const z of ZONE_ORDER) {
+        if (ZONE_ORDER.indexOf(z) >= zoneIdx) break;
+        const b = buckets.get(z);
+        if (b !== undefined && b.length > 0) { result.push(...b); buckets.set(z, []); }
+      }
+      result.push(...run);
+      const b = buckets.get(zone);
+      if (b !== undefined && b.length > 0) { result.push(...b); buckets.set(zone, []); }
+    }
+    for (const z of ZONE_ORDER) {
+      const b = buckets.get(z);
+      if (b !== undefined && b.length > 0) result.push(...b);
+    }
+    entries.length = 0;
+    entries.push(...result);
   }
 
-  // Stable topological repair: sequence members keep their occupied slots,
-  // while values placed in those slots are sorted by per-parent precedence.
+  // Stable topological repair (review MAJOR-3, zone-local): sequence members
+  // keep their occupied slots, while values placed in those slots are sorted
+  // by per-parent precedence — WITHIN a single zone. Slot keys are
+  // (parentId, zone): a foundational delta can never be written into an
+  // evolving slot, so global zone order survives the repair.
+  const zonesAfter: Zone[] = new Array(entries.length);
+  for (let i = 0; i < entries.length; i++) zonesAfter[i] = zoneOf(entries[i]!);
   const byParent = new Map<string, { slots: number[]; values: PositionEntry[] }>();
   for (let i = 0; i < entries.length; i++) {
     const sequence = sequenceOf(entries[i]!);
     if (sequence === undefined) continue;
-    const family = byParent.get(sequence.parentId) ?? { slots: [], values: [] };
+    const key = sequence.parentId + "\u0000" + zonesAfter[i]!;
+    const family = byParent.get(key) ?? { slots: [], values: [] };
     family.slots.push(i);
     family.values.push(entries[i]!);
-    byParent.set(sequence.parentId, family);
+    byParent.set(key, family);
   }
   for (const family of byParent.values()) {
     const ordered = precedenceOrder(family.values);
@@ -95,27 +146,36 @@ export function normalizeSequenceOrder(
   }
 }
 
-/** Deterministic DFS topological order over each member's optional edge. */
+/** Deterministic ITERATIVE topological order over each member's optional
+ *  edge (review MINOR-3): identical output to the recursive DFS — walk the
+ *  predecessor chain to its root, emit root-first — but with an explicit
+ *  stack, so a 200k-member lineage cannot blow the call stack. Cycles are
+ *  tolerated with the same ordinal/id fallback as before. */
 function precedenceOrder(values: PositionEntry[]): PositionEntry[] {
   const sorted = [...values].sort(sequenceCompare);
   const byId = new Map(sorted.map((entry) => [entry.item.id, entry] as const));
-  const visiting = new Set<string>();
   const emitted = new Set<string>();
   const ordered: PositionEntry[] = [];
-  const visit = (entry: PositionEntry): void => {
-    if (emitted.has(entry.item.id)) return;
-    if (visiting.has(entry.item.id)) return; // malformed cycle: ordinal/id fallback remains deterministic
-    visiting.add(entry.item.id);
-    const predecessorId = sequenceOf(entry)?.predecessorId;
-    const predecessor = predecessorId === undefined ? undefined : byId.get(predecessorId);
-    if (predecessor !== undefined) visit(predecessor);
-    visiting.delete(entry.item.id);
-    if (!emitted.has(entry.item.id)) {
+  for (const start of sorted) {
+    if (emitted.has(start.item.id)) continue;
+    // Walk up the predecessor chain collecting the family spine.
+    const spine: PositionEntry[] = [];
+    const seen = new Set<string>();
+    let cur: PositionEntry | undefined = start;
+    while (cur !== undefined && !emitted.has(cur.item.id) && !seen.has(cur.item.id)) {
+      seen.add(cur.item.id);
+      spine.push(cur);
+      const pid: string | undefined = sequenceOf(cur)?.predecessorId;
+      cur = pid === undefined ? undefined : byId.get(pid);
+    }
+    // Emit root-first: deepest ancestor, then down the chain.
+    for (let i = spine.length - 1; i >= 0; i--) {
+      const entry = spine[i]!;
+      if (emitted.has(entry.item.id)) continue;
       emitted.add(entry.item.id);
       ordered.push(entry);
-    }
-  };
-  for (const entry of sorted) visit(entry);
+   }
+  }
   return ordered;
 }
 
@@ -227,14 +287,59 @@ export function planSequenceMoves(
     itemLedgers.push(moveLedger(turn, accepted, true));
 
     if (pass === MAX_MOVE_PASSES - 1) {
-      // More than the accepted candidate remains: convergence was not
-      // observed before the hard cap. Exactly one candidate means this move
-      // completed the work and must not be mislabeled capped.
-      capped = candidates.filter((candidate) => candidate.accepted).length > 1;
+      // Review MAJOR-2 (2026-08-24): re-probe AFTER the final accepted
+      // move. The move itself can unlock another candidate — each block
+      // leaving the intervening window shrinks the next candidate's bill —
+      // so pre-move candidate counts false-negatived the cap signal.
+      capped = hasAcceptableMove(entries);
     }
   }
 
   return { movePasses, capped, acceptedMoves, reversals, moveThrash: reversals > 0 };
+}
+
+/**
+ * Post-cap probe (review MAJOR-2): does any fuse candidate remain
+ * acceptable in the CURRENT layout? Pure — no ledger writes, no mutation.
+ * Runs once, only after the fifth accepted move.
+ */
+function hasAcceptableMove(entries: PositionEntry[]): boolean {
+  const prefix = new Array<number>(entries.length + 1).fill(0);
+  for (let i = 0; i < entries.length; i++) prefix[i + 1] = prefix[i]! + entries[i]!.option.tokens;
+  return scanFuseCandidates(entries, prefix).some((c) => c.accepted);
+}
+
+function scanFuseCandidates(entries: PositionEntry[], prefix: number[]): Candidate[] {
+  const indexById = new Map<string, number>();
+  for (let i = 0; i < entries.length; i++) indexById.set(entries[i]!.item.id, i);
+  const predecessorById = new Map<string, number>();
+  const lastByParent = new Map<string, number>();
+  for (let i = 0; i < entries.length; i++) {
+    const sequence = sequenceOf(entries[i]!);
+    if (sequence === undefined) continue;
+    const explicitIndex = sequence.predecessorId === undefined ? undefined : indexById.get(sequence.predecessorId);
+    const explicit = explicitIndex !== undefined
+      && sequenceOf(entries[explicitIndex]!)?.parentId === sequence.parentId
+      ? explicitIndex
+      : undefined;
+    const predecessor = explicit ?? lastByParent.get(sequence.parentId);
+    if (predecessor !== undefined) predecessorById.set(entries[i]!.item.id, predecessor);
+    lastByParent.set(sequence.parentId, i);
+  }
+  const candidates: Candidate[] = [];
+  for (let from = 0; from < entries.length; from++) {
+    const entry = entries[from]!;
+    const sequence = sequenceOf(entry);
+    if (sequence?.role !== "delta" || sequence.placement !== "fuse") continue;
+    const predecessor = predecessorById.get(entry.item.id);
+    if (predecessor === undefined) continue;
+    const target = predecessor + 1;
+    if (target === from || target === from + 1) continue;
+    const bill = interveningFromPrefix(prefix, from, target);
+    const credit = Math.max(0, sequence.migrationCreditTokens ?? 0);
+    candidates.push({ entry, from, target, bill, credit, accepted: credit >= bill, reversal: false });
+  }
+  return candidates;
 }
 
 function moveLedger(turn: number, candidate: Candidate, accepted: boolean): ItemLedger {
