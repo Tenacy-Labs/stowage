@@ -2,8 +2,22 @@
 
 **Reviewed:** `feature/sequence-position` at `59ed387c5e5908e675f4de1439b7791dec1717ec` against `main` at `0843ebf1afbad1d30c19695f53056fb1d21edf95`  
 **Scope:** 9 changed files, +778/-68  
-**Verdict:** **NOT MERGE-READY**  
+**Verdict:** ~~**NOT MERGE-READY**~~ → **RESOLVED 2026-08-24** (see Resolution below)  
 **Severity summary:** 0 critical, **4 major**, 3 minor
+
+## Resolution (2026-08-24)
+
+All four majors and MINOR-3 are fixed at commits `6e895d8` (RED tests) + `e8db71e` (fixes), verified live:
+
+- **MAJOR-1** — `normalizeSequenceOrder` rebuilt single-pass O(n) bucket reassembly; `zoneOf` probed exactly once per entry; regression pins `zoneCalls ≤ 4n`. **Fixed.**
+- **MAJOR-2** — `capped` re-probed after the fifth accepted move via pure `hasAcceptableMove(entries)`; cascade test proves sixth-pending-move detection (5 accepted + capped:true; second call accepts it). **Fixed.**
+- **MAJOR-3** — topological repair keyed by `(parentId, zone)`; cross-zone family can never write into another zone's slots; global ZONE_ORDER monotonicity held. Reviewer ZONE_REPRO output: `[delta@foundational, base@evolving]`. **Fixed.**
+- **MAJOR-4** — per-block evidence semantics in `transactionCost`: block wall stamp wins for that block, absent stamp falls back to that block's turn stamp, snapshot expiry short-circuits. Reviewer TTL_REPRO: `partialWallCost 0.84 → 0.30 == noWallCost`. **Fixed.**
+- **MINOR-3** — `precedenceOrder` iterative; 200k-member lineage completes (was `RangeError`). **Fixed.**
+- **MINOR-1** — partial coverage added: option-over-item metadata override test. (Remaining listed gaps acknowledged as backlog.)
+- **MINOR-2** — RED tests committed as a separate durable commit (`6e895d8`) before the fix commit; observed-RED evidence recorded in its message.
+
+**Gates after fixes:** `bunx tsc --noEmit` exit 0 · `bun test` **648/648**, 8,139 expects, 5 files (642 pre-existing all passing) · reviewer repro scripts re-run green against fixed tree · `git diff --check` clean.
 
 The core direction is sound: sequence metadata is optional, option metadata overrides item metadata, deltas remain independent items, the planner uses prefix differences for O(1) bill queries, tie-breaking is explicit, no random search was introduced, diagnostics and regret rows are present, and the exact MCKP engine has only one call site. However, four contract-affecting defects remain.
 
