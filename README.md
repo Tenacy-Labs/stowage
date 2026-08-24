@@ -78,18 +78,25 @@ values at 10k groups reach 100–500M. Even in a rigged valid regime the
 rigged-best-case run produced 6.3M overflows, the wrong answer, and ran
 slower than int32 (48 vs 29 ms). int32 is the correctness floor.
 
-**Validated, deferred: Rust FFI kernel** (docs/spikes/002-rust-dp-ffi,
-003-simd): an exact mirror of the SoA kernel as a Rust cdylib via
-`bun:ffi`, with the SIMD follow-up. Differentials: 400 problems each,
-byte-identical. Spike 002 (scalar): memory-freedom regime 9.6x (tie-heavy
-200k: 6 ms vs 53 ms divide-and-conquer); wall 5k × 200k: 0.8 s vs 2.4 s.
-Spike 003 (loop-interchange + NEON auto-vectorization, i32::MIN
-sentinel): **3.2 ms vs 9.2 ms TypeScript at 30k = 4.2x; 585 ms at the
-wall = 6.9x vs TS D&C**. Shared-budget regime is where the win now lives
-too. Production notes: land in the knapsack repo with TS as differential
-oracle; Hirschberg D&C port for O(capacity) memory at the wall. Decision
-pending owner ruling.
-
+**Shipped: native SIMD kernel** (PR #4 + #5, 2026-08-24; docs/spikes/002,
+003): the spike-003 kernel productionized. A Rust cdylib
+(`vendor/knapsack/native`) mirrors the SoA DP exactly — same recurrence,
+windowing, tie-breaks, budget gate — compiled for baseline vector widths
+only (NEON on aarch64, SSE2-class auto-vectorization on x86_64; no AVX
+assumptions). **Default policy (PR #5): `solve()` prefers the compiled
+kernel and falls back to the TypeScript SoA kernel when the dylib is
+absent or unloadable — identical outputs either way (differential-proven,
+500 problems, ran>0 guard). `dpKernel: "reference"` remains the explicit
+opt-out.** `stats.dpKernelUsed` reports which path served the answer.
+Measured end-to-end on DP-required problems (300 groups, cap 30k):
+default 5.6 ms vs 17.2 ms reference = 3.1x; kernel-level 4.2x at 30k
+window / 6.9x at the wall. CI (x86_64 linux, no dylib) exercises the
+fallback path visibly. Review round 2 caught a process-abort class
+(out-of-i32 weights passing validation and truncating in the Int32
+flatten) — root-fixed by an exact weight>capacity filter before the DP
+in all kernels, plus in-kernel validation (rc −3) and catch_unwind
+containment (rc −4); both placements carry regression tests. Prebuilt
+dylib provenance: `vendor/knapsack/native/prebuilt/PROVENANCE.md`.
 ## Status
 
 **v0.1.0 — solver ported, sequence axis landed.** The full ex-agent-kernel

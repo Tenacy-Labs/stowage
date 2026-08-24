@@ -92,6 +92,7 @@ export function solve(
         optionsAfterFathoming: optionsAfterDominance,
         dpRequired: false,
         dpCellsVisited: 0,
+        dpKernelUsed: "none",
       },
     };
   }
@@ -114,6 +115,7 @@ export function solve(
         optionsAfterFathoming: optionsAfterDominance,
         dpRequired: false,
         dpCellsVisited: 0,
+        dpKernelUsed: "none",
       },
     };
   }
@@ -199,6 +201,7 @@ export function solve(
         optionsAfterFathoming: optionsAfterFathoming,
         dpRequired: false,
         dpCellsVisited: 0,
+        dpKernelUsed: "none",
       },
     };
   }
@@ -209,13 +212,24 @@ export function solve(
   // solveDp (reference, D&C fallback above budget). Bounded mode above
   // budget is handled earlier and takes precedence.
   let dp: DpResult;
-  if (options.dpKernel === "native" && expectedDpBytes(dpGroups.length, problem.capacity) <= resolvedDpBudget) {
+  let dpKernelUsed: "native" | "soa" | "reference";
+  // Default policy (PR #5, owner ruling 2026-08-24): prefer the compiled
+  // native kernel, fall back to the TypeScript SoA kernel when the dylib
+  // is absent or unloadable (identical outputs, differential-proven).
+  // "reference" remains the explicit opt-out. Above budget, all paths
+  // route to the divide-and-conquer reference.
+  const wantKernel = options.dpKernel ?? "native";
+  if (wantKernel === "native" && expectedDpBytes(dpGroups.length, problem.capacity) <= resolvedDpBudget) {
     const native = solveDpNative(dpGroups, problem.capacity, resolvedDpBudget);
-    dp = native !== null ? native : solveDpSoa(dpGroups, problem.capacity, resolvedDpBudget);
-  } else if (options.dpKernel === "soa" && expectedDpBytes(dpGroups.length, problem.capacity) <= resolvedDpBudget) {
-    dp = solveDpSoa(dpGroups, problem.capacity, resolvedDpBudget);
+    if (native !== null) {
+      dp = native; dpKernelUsed = "native";
+    } else {
+      dp = solveDpSoa(dpGroups, problem.capacity, resolvedDpBudget); dpKernelUsed = "soa";
+    }
+  } else if (wantKernel === "soa" && expectedDpBytes(dpGroups.length, problem.capacity) <= resolvedDpBudget) {
+    dp = solveDpSoa(dpGroups, problem.capacity, resolvedDpBudget); dpKernelUsed = "soa";
   } else {
-    dp = solveDp(dpGroups, problem.capacity, resolvedDpBudget);
+    dp = solveDp(dpGroups, problem.capacity, resolvedDpBudget); dpKernelUsed = "reference";
   }
 
   const choices = extractChoices(dpGroups, dp.choiceIndex);
@@ -232,6 +246,7 @@ export function solve(
       optionsAfterFathoming,
       dpRequired: true,
       dpCellsVisited: dp.cellsVisited,
+      dpKernelUsed,
     },
   };
 }
