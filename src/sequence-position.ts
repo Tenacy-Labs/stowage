@@ -278,6 +278,10 @@ function scanFuseCandidates(
   prefix: number[],
   previousMoves: ReadonlyMap<string, PriorMove> | undefined,
 ): Candidate[] {
+  // normalizeSequenceOrder guarantees per-parent precedence, so one linear
+  // scan resolves every member's immediate predecessor; candidate evaluation
+  // is then a pair of Map lookups plus an O(1) prefix query.
+  // (Comment restored in the #5 dedup — it lived in the removed pass-loop copy.)
   const indexById = new Map<string, number>();
   for (let i = 0; i < entries.length; i++) indexById.set(entries[i]!.item.id, i);
   const predecessorById = new Map<string, number>();
