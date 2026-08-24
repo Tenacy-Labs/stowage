@@ -51,8 +51,11 @@ describe("full-window bounded relief", () => {
     // ENGAGED: over-budget fresh content forces exactMckpRelief (not phase-1 prune).
     expect(r1.totalTokens).toBeGreaterThan(0);
     expect(r1.totalTokens).toBeLessThanOrEqual(ps.budgetLambda);
-    // FAST at full window: bounded mode, not 37s divide-and-conquer.
-    expect(ms).toBeLessThan(2_000);
+    // FAST at full window: bounded mode, not divide-and-conquer exact.
+    // Hardware-honest threshold: CI runner measured 10.4s, M4 Max 1.6s;
+    // the exact path at this scale is 37-42s local / minutes on CI —
+    // 15s separates the regimes on any runner.
+    expect(ms).toBeLessThan(15_000);
     // Deterministic.
     expect(r2.totalTokens).toBe(r1.totalTokens);
     expect(r2.placements).toEqual(r1.placements);
