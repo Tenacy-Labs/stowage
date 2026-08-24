@@ -134,3 +134,38 @@ Fresh-context re-verification @ `ef05fcf` (bounded-mode commits + docs). Product
 ### Verdict: REQUEST CHANGES
 
 One required change: **R2-1** (`solve.ts:170`, one line, fix verified by this review). All four round-1 findings are genuinely and verifiably resolved; the bounded mode's incumbent, status, budget gate, and forwarding are correct — only the `lpUpper` bound semantics are broken, and the proven one-liner closes it.
+
+---
+
+## Round 3 verdict (reviewer)
+
+Fresh-context gate verification @ `52a0fac` (branch `perf/relief-dp`, in sync with origin). Scope check first: `git diff --stat ef05fcf..52a0fac` shows exactly three files — `vendor/knapsack/src/solve.ts` (1 line), `test/bounded-brackets.test.ts` (new, +29), `CODE_REVIEW_PR3.md` (this ledger). No other changes. Working tree clean at start and end.
+
+### 1. Fix present at head
+
+`solve.ts:170` (bounded branch) reads:
+
+```ts
+bounds: { lpUpper: Math.max(lp.upperBound, walk.break.upperBound), greedyLower: walk.lowerBound },
+```
+
+Exactly the described one-line fix. The hull LP (`lp.upperBound`, computed at solve.ts:78) now dominates the walk's break bound, so `lpUpper` can no longer fall below OPT on non-convex fathomed sets.
+
+### 2. Regression test is genuinely discriminating
+
+`bun install` first (copy-sync hazard, per ledger item E): `diff -r vendor/knapsack node_modules/@connectotron/knapsack` → IDENTICAL.
+
+- **With fix:** `bun test test/bounded-brackets.test.ts` → **1 pass, 0 fail** (16 expects). The test forces the bounded branch (`maxDpBytes: 5`), solves the same instance exactly (`{}` → status optimal), and asserts `lpUpper ≥ OPT − 1e-9` across 4 machine-searched non-convex cases.
+- **Fix temporarily reverted** (python string-replace in BOTH `vendor/knapsack/src/solve.ts` and the `node_modules` copy): test → **0 pass, 1 fail** with exactly the predicted signature — `Expected: >= 55.999999999, Received: 55.666666666666664` (lpUpper 55.667 < OPT 56; Dantzig break bound below OPT on a non-convex set).
+- **Fix restored:** string-replaced back; `git diff` and `git status --porcelain` both empty (byte-identical restore); `diff -r vendor node_modules` → IDENTICAL; test → **1 pass** again.
+
+The test fails on the bug and passes on the fix — it is not decorative.
+
+### 3. Full gates @ `52a0fac`
+
+- `bunx tsc --noEmit` → **exit 0** (via `bun x --bun tsc`; plain `bunx` shells to a homebrew node with a broken libuv in this sandbox, not a repo issue).
+- `bun test` → **656 pass / 0 fail, 9,223 expect() calls, 9 files** (3.78s). Matches PR claims exactly (was 655/9,207/8 at round 2; +1 test/+16 expects/+1 file = the new regression file).
+
+### Verdict: APPROVE
+
+R2-1 is genuinely fixed with a discriminating regression test; full gates green; diff scope since round 2 is exactly the fix + the test + this ledger. No outstanding findings. **Merge-ready.**
