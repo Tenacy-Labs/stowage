@@ -47,6 +47,47 @@ Extracted from agent-kernel's optimizer (ADR-0005 lineage) as the
 phase-3 sequence axis made it a standalone component reusable by other
 harnesses. Founding rulings: [ADR-0000](docs/adr/0000-charter.md).
 
+## Performance
+
+The solver is exact by default. Nothing below changes an answer a user of
+the default options could observe — the perf work attacks only the
+over-budget regime, where exact relief previously stalled for tens of
+seconds.
+
+**What shipped (2026-08-24, PR #3, three review rounds):**
+
+- **SoA DP kernel** (`dpKernel: "soa"`, opt-in): structure-of-arrays
+  back-pointer DP — 1.2–1.4x on typical windows; byte-identical outputs
+  (350 + 400 problem differential suites; the 400-problem suite runs in CI
+  via `test/dp-soa.test.ts`).
+- **Bounded relief mode** (automatic above the 50 MiB DP budget): the
+  exact divide-and-conquer fallback cost 36–38 s at 10k groups / 900k
+  window (measured counterfactuals). Bounded mode returns a feasible
+  incumbent + a certified interval `[greedyLower, lpUpper]` in ~1.7 s
+  local / ~10 s CI — a ~20x improvement, never claiming optimality
+  (status `"bounded"`). Measured gap on the full-window test: 0.0055%.
+  Certification was itself reviewed: the round-2 reviewer caught `lpUpper`
+  able to fall below OPT on non-convex shapes (84 < 98) — fixed to
+  `max(hull LP, walk break)`, property-verified 0/8,758 violations, with a
+  machine-generated discriminating regression test.
+
+**Explored and rejected: int16 representation** (docs/spikes/001-int16):
+profits are `utility × 1000` (SCALE at the relief call site); a single
+option at utility 50 = 50,000 > int16 max 32,767, and accumulated DP
+values at 10k groups reach 100–500M. Even in a rigged valid regime the
+rigged-best-case run produced 6.3M overflows, the wrong answer, and ran
+slower than int32 (48 vs 29 ms). int32 is the correctness floor.
+
+**Validated, deferred: Rust FFI kernel** (docs/spikes/002-rust-dp-ffi):
+an exact mirror of the SoA kernel as a Rust cdylib via `bun:ffi`.
+Differential: 400 problems, byte-identical. Wins concentrated where TS
+cannot go: memory-freedom regime 9.6x (tie-heavy 200k: 6 ms vs 53 ms
+divide-and-conquer); the wall shape 5k groups × 200k: 0.8 s vs 2.4 s
+(3.1x, via a 1 GB back-pointer table — production form would port
+Hirschberg D&C for O(capacity) memory). Shared-budget regime only
+1.3–1.4x — not worth an FFI dependency there. Decision pending: land in
+the knapsack repo as the over-budget path with TS as differential oracle.
+
 ## Status
 
 **v0.1.0 — solver ported, sequence axis landed.** The full ex-agent-kernel
