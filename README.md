@@ -49,14 +49,20 @@ harnesses. Founding rulings: [ADR-0000](docs/adr/0000-charter.md).
 
 ## Status
 
-**v0.1.0 — solver ported.** The full ex-agent-kernel solve core
-(selection, suffix pricing, horizons, evidence, cache model, params,
-contract types — ~1,500 lines) runs here, byte-identical, over the
-vendored `@connectotron/knapsack`. agent-kernel consumes it via
-`file:vendor/stowage` re-export shims; its 869-test suite is the port's
-acceptance test. [ADR-0002](docs/adr/0002-solver-port.md) records the
-move; [ADR-0001](docs/adr/0001-sequence-position-semantics.md) (the
-phase-3 sequence axis) lands next. License: pending owner ruling.
+**v0.1.0 — solver ported, sequence axis landed.** The full ex-agent-kernel
+solve core (selection, suffix pricing, horizons, evidence, cache model,
+params, contract types — ~1,500 lines) runs here, byte-identical, over the
+vendored `@connectotron/knapsack`; agent-kernel consumes it via
+`file:vendor/stowage` re-export shims (its 869-test suite remains the
+port's acceptance test).
+
+[ADR-0001](docs/adr/0001-sequence-position-semantics.md) — the sequence
+position axis — has landed: sequence-aware normalization (canonical
+zone-order, zone-local topological repair), fuse-move planning with
+capped passes and reversal tracking, and per-block TTL evidence on both
+the transaction-cost and shared-bill paths. 651 tests, strictest tsc,
+two independent review gates. [ADR-0002](docs/adr/0002-solver-port.md)
+records the original port. License: pending owner ruling.
 
 ## Development
 
