@@ -18,7 +18,11 @@ x86_64 — never AVX assumptions).
 
 | triple | size | sha256 | built with |
 |---|---|---|---|
-| aarch64-apple-darwin | 349840 | 619d097cd6049964373dbce9e4799f8f8fd44b664f36466c1349364e31f26f1b | rustc 1.95.0, cargo 1.95.0, profile release (opt 3, lto, codegen-units 1, unwind) |
+| aarch64-apple-darwin | 349840 | 619d097cd6049964373dbce9e4799f8f8fd44b664f36466c1349364e31f26f1b | rustc 1.95.0 (local; pin retained — CI build size-identical, not bit-identical: Mach-O UUIDs) |
+| aarch64-unknown-linux-gnu | 356648 | ed995175a60dfe8d9a7beeeb9184a417fbfeef80140336c0519e84966a56a46a | rustc 1.95.0, cross: ubuntu-latest + gcc-aarch64-linux-gnu |
+| x86_64-apple-darwin | 337816 | a501c5bf6d0558773b3244b951206a08a15d2451f95f40ad95d94582ebe63ebf | rustc 1.95.0, cross: macos-15 runner |
+| x86_64-pc-windows-msvc | 102912 | ab748bf6a06a2d9d37aa6db6bffe1f16440d31aaf2d24aee0896438b741844f9 | rustc 1.95.0, native: windows-latest MSVC |
+| x86_64-unknown-linux-gnu | 343064 | 29d224b715d8e7b0fc1a7ce254509e7d0b5277bf4c99dde07ba1096df36ab887 | rustc 1.95.0, native: ubuntu-latest runner |
 
 ## Verification
 
