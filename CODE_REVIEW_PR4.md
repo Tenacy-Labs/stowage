@@ -104,3 +104,189 @@ RUSTFLAGS policy.
 C ABI carries no byte param — the triplicated constant is now 3 documented
 sights, not silent drift); countCells parity note stands as documented.
 CI-native-path and x86_64 prebuilt remain follow-ups (unchanged).
+
+
+---
+
+## Round 3 — fresh-context verification gate (reviewer, 2026-08-24, HEAD dcc8262)
+
+Scope: `git diff 667dd52..dcc8262` (9 files, +316/−4). Method: fresh read of the
+round-2 code (solve.ts scale filter, lib.rs wrapper + validation, native.ts,
+PROVENANCE.md, both test files, plus validate.ts/dominance.ts/lp.ts/fathom.ts/
+dp-soa.ts for the invariants the filter depends on); live gates; independent
+adversarial probes (three-kernel C1 agreement, own 300-problem junk sweep,
+filter-revert discrimination in /tmp copies, old-vs-new dylib ABI probes in
+isolated children, catch_unwind containment, infeasible-path reachability,
+bit-for-bit rebuild). No production code modified; nothing committed; tree
+verified clean at HEAD dcc8262 after probing (only this file changed).
+
+## Verdict: **APPROVE**
+
+### A. Three-kernel agreement on C1 shapes — VERIFIED
+
+Independent probe (not the suite's code): weight 2^31+100 at BOTH placements,
+capacity 10. reference = soa = native: status "optimal", value 5, identical
+choice ids (`g0:b, g1:b`) for both placements. dylib present
+(nativeAvailable true). Matches the author's claim exactly.
+
+### B. 300-problem junk sweep — VERIFIED (own generator, not the author's)
+
+Own xorshift generator (seed 0xC0FFEE + i·7919, different construction from
+the suite's): 300 problems, 2–9 groups, cap 20–419, junk options (weight
+2^31+1..2^31+5000) seeded at 12.0% (579/4820 options). All three kernels
+compared on status, value, and full choice id lists: **0 mismatches**,
+300/300 ran, 5 problems legitimately infeasible (min-weight sum > capacity,
+all three kernels agreed "infeasible" on those).
+
+### C. Scale filter exactness and index consistency — VERIFIED
+
+- **Exactness argument holds**: exactly one option per group, total weight ≤
+  capacity ⇒ no selection can contain an option with weight > capacity;
+  dropping them cannot change the optimum. Survivors have weight ≤ capacity ≤
+  2^21−1 < 2^31 (MAX_CAPACITY) → i32-safe. Profits < 2^31 individually
+  (validateProblem bounds Σ per-group max profits < 2^31). The silent-
+  truncation class is closed for BOTH SoA's Int32Array flatten and the FFI
+  flatten, at the single correct layer.
+- **Placement correct**: applied to `dpGroups` after the fathom mapping and
+  before kernel dispatch/bounded-mode (soa/native/reference all see filtered
+  groups; bounded mode's greedyWalk also runs on filtered groups).
+- **Index consistency**: filtered arrays are new objects but reassigned to
+  `dpGroups` before dispatch; `extractChoices(dpGroups, dp.choiceIndex)` at
+  line 221 receives the same arrays the DP saw; choiceIndex indexes the
+  filtered arrays' options. Verified behaviorally by A/B (identical ids).
+- **The `keep.length === 0 ? … : g` fallback is unreachable** (adversarial
+  trace + empirical): Pareto groups are weight-sorted so `options[0]` is the
+  group min; the `minWeightSum > capacity` early return guarantees each
+  group's `options[0].weight ≤ capacity`; convexHull preserves `pts[0]`;
+  fathom always keeps the incumbent option, whose per-group weight is ≤ the
+  walk total ≤ capacity. So every group retains ≥1 in-capacity option and the
+  filter can never empty one (defensive branch only, mirroring the fathom
+  guard's style). Tight-feasible probe (minWeightSum == capacity, junk
+  present) stays optimal/5 on all three kernels — the filter cannot flip
+  feasibility.
+
+### D. Discrimination — VERIFIED, with the honest nuance recorded
+
+Committed dylib sha256 = size = PROVENANCE.md row
+(`619d097c…f26f1b`, 349840 B) ✓. Full 2×2 matrix, all cells run empirically
+(reverted filter tested in a /tmp copy of the vendor tree — repo untouched —
+verified byte-identical to HEAD except the filter hunk):
+
+| state | g1-placement test | g0-placement test |
+|---|---|---|
+| committed (filter + new dylib) | PASS (5/5) | PASS (5/5) |
+| filter reverted, NEW dylib | **FAILS** — native returns value −1, choices [] vs ref 5 | passes (rc −3 → SoA fallback; SoA's g0 window uses untruncated JS numbers → correct 5 by luck) |
+| filter PRESENT, OLD dylib (667dd52) | PASS (filter removes junk pre-kernel → 5) | PASS (same) |
+| filter reverted, OLD dylib | passes (g1 silently-lucky — the round-1 finding) | **SIGABRT**: child exits −6, "index out of bounds: len 11, index 18446744071562068068" at lib.rs:115 |
+
+Conclusion: the suite is non-vacuous — reverting the root fix turns the
+g1 test red (value/choices assertions violated), and the pre-fix world
+(filter absent + old dylib) kills the process on the g0 shape. Honest nuance,
+not a blocker: neither test alone discriminates every single-component
+regression (g0 survives filter-revert via the SoA-lucky path; both survive
+old-dylib-with-filter). The pair as a whole catches the real-world reverts.
+
+Old-dylib SIGABRT vs new-dylib rc −3 on the raw truncated-negative-weight
+input: verified via direct `bun:ffi` ABI calls in isolated children (old:
+exit −6 at lib.rs:115; new: clean rc −3). ✓
+
+### E. Differential honesty — VERIFIED
+
+Both differentials ran 500/500 problems, 0 mismatches, `expect(ran) > 0`
+guard present and satisfied (dylib present on this host). Forced-absent runs
+(`KNAPSACK_NATIVE_DYLIB=/nonexistent/...`, whole test files in isolation):
+5/5 pass on BOTH trees, differentials log the honest skip message and the
+fallback/C1 tests pass on the pure-TS path. ✓
+
+### F. Gates — ALL GREEN (run this round, this host)
+
+- vendor suite: **636/636** pass (0 fail, 6323 expects)
+- stowage suite: **666/666** pass (0 fail, 9259 expects)
+- `bun x --bun tsc --noEmit`: exit 0 in BOTH trees (the round-1 vendor tsc
+  break from the missing `originalCount` is fixed)
+
+### G. Hygiene — CLEAN
+
+Diff contains exactly the 9 expected files; no build artifacts (`target/`
+gitignored, untracked); `Cargo.lock` byte-unchanged in range (zero-dep
+crate, consistent with Cargo.toml whose only change is the panic-strategy
+comment/removal); no stray files beyond this review doc (expected).
+PROVENANCE.md is accurate — see the rebuild check below.
+
+### H. Kernel wrapper correctness — VERIFIED, one best-effort note
+
+- `catch_unwind(AssertUnwindSafe(...))` + `unwrap_or(-4)` at the FFI edge;
+  `panic = "abort"` removed; **containment empirically proven**: a
+  deterministic in-kernel panic path (n_groups=0 with length-1 group_start →
+  gs[1] slice index at the g0-seed read) returns rc −4 cleanly on the new
+  dylib where the old dylib SIGABRTs (exit −6). Unreachable from TS (loader
+  guards `n === 0`), reachable only by direct C misuse — exactly what
+  belt-and-braces is for. Panic payloads print to stderr (noise, not a leak);
+  Rust unwinding runs destructors, so no allocation leak into the rc path
+  beyond inherent panic semantics. Best-effort acceptable.
+- Validation ordering: n_groups/capacity ≥ 0 checked before any deref;
+  `gs[0] != 0`, monotone `gs[1..=n]`, non-negative weights/profits all
+  checked after slice construction and BEFORE any DP allocation or gather
+  arithmetic. Slices are built from caller-declared lengths (`gs[n]`) — the
+  standard C-ABI trust boundary, unchanged from round 1; within that
+  contract all validation reads are in-bounds.
+- Direct ABI probes on the new dylib: rc 0 + correct value 5/choices on a
+  valid problem; rc −3 on negative n, negative capacity, gs[0]≠0,
+  non-monotone gs, negative weight, negative profit, and the C1
+  truncated-negative weight; rc −1 over budget; rc −2 infeasible. All
+  conventions match PROVENANCE.md. ✓
+- Capacity upper bound in-kernel correctly absent (TS budget gate is the
+  enforcement point; `capacity < 0` rc −3 is the ABI-level defense).
+
+### H2. Infeasibility semantics — UNCHANGED, REACHABLE WHERE IT MATTERS
+
+- solve-level: min-weight sum > capacity (with junk options mixed in) → all
+  three kernels return the infeasible shape (`status "infeasible"`, value 0,
+  choices null) via the pre-DP early return, exactly as pre-PR.
+- kernel-level: genuinely infeasible DP input (min-weight sum > capacity,
+  all weights ≤ cap) still hits `bestVal < 0`: solveDpSoa/solveDp return
+  `{value: −1, weight: −1, choiceIndex: []}` and solveDpNative maps rc −2 to
+  the identical shape. The `: g`/filter cannot make a feasible problem
+  infeasible (incumbent and each group's `options[0]` always survive), so
+  solve() reaching the DP with infeasible groups remains as unreachable as
+  it was pre-PR (the early return catches it first) — behavior preserved.
+
+### Rebuild reproducibility (bonus check)
+
+PROVENANCE.md's recipe executed verbatim in-repo (`cargo build --release`,
+rustc/cargo 1.95.0 — matches the pin): the rebuilt dylib is **bit-for-bit
+identical** to the committed artifact (sha256 `619d097c…f26f1b`). A /tmp-path
+build differs only in embedded DWARF paths/code-signature (size-identical,
+same export `_knapsack_dp`) — the recipe's in-place requirement is inherent
+to reproducibility here, worth a one-line note in PROVENANCE.md someday but
+the doc's `cd vendor/knapsack/native` already implies it. Tracked tree stayed
+clean throughout (target/ ignored).
+
+### Non-blocking observations
+
+1. **Stale `node_modules/@connectotron/knapsack` copy in this workspace**
+   (pre-round-2 solve.ts + old dylib). Not a repo defect: node_modules is
+   gitignored and synced by `bun install`; all tests import the vendor path
+   directly. No live risk either: the only app consumer
+   (src/solver.ts:712) calls `solveMckp(..., { reliefMode: "bounded" })`
+   with default dpKernel "reference" — it never loads a dylib. A `bun
+   install` on merge syncs the copy.
+2. `stats.optionsAfterFathoming` now also reflects the scale filter (name
+   slightly understates what it counts). Cosmetic.
+3. The C1 regression tests' first comment still says "The TS i32 guard must
+   reject -> null -> soa fallback" — describes the round-1 fix shape that
+   was replaced by the root filter; the assertions themselves are
+   fix-agnostic (reference-vs-native identity). Cosmetic.
+4. g0-test discrimination nuance recorded under D — if future edits make
+   SoA's g0 window truncation-prone, that test could pass vacuously again;
+   the g1 test is the load-bearing one for the filter.
+
+### Round-2 claims vs reality
+
+Every author claim (A–H2) reproduced or verified against the tree; no
+overstatement found. Round-1 C1 is closed at the correct layer with defense
+in depth behind it; M1 provenance is complete and accurate (including the
+checksum); the round-1 vendor-tsc minor is fixed; the panic=abort minor (6)
+is resolved by the unwind+catch_unwind design.
+
+**Final: APPROVE.**
