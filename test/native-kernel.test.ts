@@ -105,4 +105,57 @@ describe("vendored native kernel (stowage side)", () => {
       _resetNativeCache();
     }
   });
+
+  test("C1 regression: out-of-i32 weight passes validation, must not crash — falls back to soa", () => {
+    // PR4 review C1: a weight of 2^31+100 passes validateProblem (only
+    // profit sums and the 2^53 envelope are bounded), truncates negative in
+    // the Int32Array flatten, and crashed the native kernel (SIGABRT via
+    // panic=abort). The TS i32 guard must reject -> null -> soa fallback,
+    // producing the same answer as dpKernel "reference".
+    const groups = [
+      { id: "g0", options: [
+        { id: "a", weight: 1, profit: 1 },
+        { id: "b", weight: 2, profit: 3 },
+      ], originalCount: 2 },
+      { id: "g1", options: [
+        { id: "a", weight: 2147483748, profit: 5 }, // 2^31 + 100
+        { id: "b", weight: 3, profit: 2 },
+      ], originalCount: 2 },
+    ];
+    const problem = { groups, capacity: 10 };
+    const ref = solve(problem, { dpKernel: "reference" });
+    expect(ref.status).toBe("optimal");
+    expect(ref.value).toBe(5);
+    // The exact crash repro: this call aborted the process pre-fix.
+    const nat = solve(problem, { dpKernel: "native" });
+    expect(nat.status).toBe("optimal");
+    expect(nat.value).toBe(5);
+    expect(JSON.stringify(nat.choices?.map((c) => c.optionId))).toBe(
+      JSON.stringify(ref.choices?.map((c) => c.optionId)),
+    );
+  });
+
+
+  test("C1 regression (g0 placement): out-of-i32 weight in the FIRST group — pre-fix SIGABRT shape", () => {
+    const groups = [
+      { id: "g0", options: [
+        { id: "a", weight: 2147483748, profit: 5 }, // 2^31 + 100, FIRST group
+        { id: "b", weight: 2, profit: 3 },
+      ], originalCount: 2 },
+      { id: "g1", options: [
+        { id: "a", weight: 1, profit: 1 },
+        { id: "b", weight: 3, profit: 2 },
+      ], originalCount: 2 },
+    ];
+    const problem = { groups, capacity: 10 };
+    const ref = solve(problem, { dpKernel: "reference" });
+    expect(ref.status).toBe("optimal");
+    const nat = solve(problem, { dpKernel: "native" });
+    expect(nat.status).toBe("optimal");
+    expect(nat.value).toBe(ref.value);
+    expect(JSON.stringify(nat.choices?.map((c) => c.optionId))).toBe(
+      JSON.stringify(ref.choices?.map((c) => c.optionId)),
+    );
+  });
+
 });

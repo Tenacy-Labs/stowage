@@ -67,15 +67,37 @@ unsafe fn gather_max(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn knapsack_dp(
+pub extern "C" fn knapsack_dp(
     flat_w: *const c_int, flat_p: *const c_int, group_start: *const c_int,
     n_groups: c_int, capacity: c_int, out: *mut c_int, out_choices: *mut c_int,
 ) -> c_int {
+    // Panic containment (PR4 review): a panic escaping a cdylib aborts the
+    // host process. Unwind (Cargo default) + catch_unwind at the FFI edge
+    // maps any residual panic to rc -4 -> loader returns null -> caller
+    // falls back to the TypeScript kernel.
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        unsafe { knapsack_dp_inner(flat_w, flat_p, group_start, n_groups, capacity, out, out_choices) }
+    }));
+    r.unwrap_or(-4)
+}
+
+unsafe fn knapsack_dp_inner(
+    flat_w: *const c_int, flat_p: *const c_int, group_start: *const c_int,
+    n_groups: c_int, capacity: c_int, out: *mut c_int, out_choices: *mut c_int,
+) -> c_int {
+    // Scalar guards first (PR4 review C1): negative counts/capacity can only
+    // come from direct FFI misuse; rc -3 = invalid input.
+    if n_groups < 0 || capacity < 0 {
+        return -3;
+    }
     let n = n_groups as usize;
     let cap = capacity as usize;
     let width = cap + 1;
     // Budget gate FIRST (mirrors solveDpSoa's throw-before-allocate): rc -1
-    // = over budget, caller falls back to the TS path.
+    // = over budget, caller falls back to the TS path. The 50 MiB constant
+    // is a BACKSTOP: the TS loader (src/native.ts) enforces the caller's
+    // resolved maxDpBytes before invoking; the C ABI carries no byte-sized
+    // parameter, so per-call budgets are enforced on the TS side only.
     if expected_dp_bytes(n, cap) > DEFAULT_DP_BUDGET {
         return -1;
     }
@@ -83,6 +105,26 @@ pub unsafe extern "C" fn knapsack_dp(
     let flat_w = unsafe { std::slice::from_raw_parts(flat_w, total) };
     let flat_p = unsafe { std::slice::from_raw_parts(flat_p, total) };
     let gs = unsafe { std::slice::from_raw_parts(group_start, n + 1) };
+
+    // Input validation (PR4 review C1): the TS loader range-guards before
+    // the Int32Array flatten, but this is also a public C symbol — defend
+    // in depth. Weights must be non-negative (a negative would sign-extend
+    // to a huge usize index in the g0-seed/gather paths); profits
+    // non-negative (oracle semantics: best scan initializes at -1);
+    // group_start strictly increasing from 0. rc -3 -> loader falls back.
+    if gs[0] != 0 {
+        return -3;
+    }
+    for i in 1..=n {
+        if gs[i] < gs[i - 1] {
+            return -3;
+        }
+    }
+    for i in 0..total {
+        if flat_w[i] < 0 || flat_p[i] < 0 {
+            return -3;
+        }
+    }
 
     let mut prev: Vec<i32> = vec![SENT; width];
     let mut cur: Vec<i32> = vec![SENT; width];

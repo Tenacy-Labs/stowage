@@ -11,7 +11,9 @@ crate-type = ["cdylib"]
 opt-level = 3
 lto = true
 codegen-units = 1
-panic = "abort"
+# panic strategy left at default (unwind): the FFI edge wraps the body in
+# catch_unwind (see lib.rs) so residual panics become rc -4 instead of
+# aborting the host process (PR4 review C1 belt-and-braces).
 
 # Max-compat policy (2026-08-24 ruling): one source, no nightly, no
 # -C target-cpu overrides. aarch64: NEON is baseline (guaranteed by the

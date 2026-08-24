@@ -120,6 +120,9 @@ export function solveDpNative(
   if (lib === null) return null;
   const n = reduced.length;
   if (n === 0 || expectedDpBytes(n, capacity) > maxDpBytes) return null;
+  // i32-range inputs are guaranteed upstream: solve.ts filters weight > capacity
+  // (capacity <= 2^21-1 by validation), and profits < 2^31 by the MAX_TOTAL_PROFIT
+  // gate; the in-kernel validation (lib.rs, rc -3) is defense in depth.
   const total = reduced.reduce((s, g) => s + g.options.length, 0);
   const flatW = new Int32Array(total);
   const flatP = new Int32Array(total);

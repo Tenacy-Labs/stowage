@@ -147,6 +147,28 @@ export function solve(
       return keep.length > 0 ? { ...g, options: keep } : g;
     });
   }
+  // Exact scale filter (PR4 review C1 root fix, 2026-08-24): an option
+  // with weight > capacity can never appear in any feasible selection
+  // (exactly one option chosen per group, total weight <= capacity), so
+  // dropping it is exact. Capacity is validated <= 2^21-1 (MAX_CAPACITY),
+  // so every surviving weight fits i32; profits are already bounded by
+  // MAX_TOTAL_PROFIT < 2^31. This closes the silent-truncation class for
+  // BOTH the SoA Int32Array flattening and the native Int32 FFI flatten —
+  // inputs the reference D&C handled via float64 were silently corrupted
+  // (SoA returned infeasible, native could panic) before this filter.
+  let scaleFiltered = false;
+  for (const g of dpGroups) {
+    for (const o of g.options) {
+      if (o.weight > problem.capacity) { scaleFiltered = true; break; }
+    }
+    if (scaleFiltered) break;
+  }
+  if (scaleFiltered) {
+    dpGroups = dpGroups.map((g) => {
+      const keep = g.options.filter((o) => o.weight <= problem.capacity);
+      return keep.length > 0 ? { ...g, options: keep } : g;
+    });
+  }
   const optionsAfterFathoming = dpGroups.reduce((s, g) => s + g.options.length, 0);
 
   // 5. Exact DP.
