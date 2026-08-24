@@ -221,46 +221,11 @@ export function planSequenceMoves(
     for (let i = entries.length - 1; i >= 0; i--) suffix[i] = suffix[i + 1]! + entries[i]!.option.tokens;
     void suffix; // both axes are preprocessed once; candidates use prefix differences.
 
-    // normalizeSequenceOrder guarantees per-parent precedence. One linear
-    // scan therefore resolves every member's immediate predecessor; candidate
-    // evaluation below is a pair of Map lookups plus an O(1) prefix query.
-    const predecessorById = new Map<string, number>();
-    const lastByParent = new Map<string, number>();
-    const indexById = new Map<string, number>();
-    for (let i = 0; i < entries.length; i++) {
-      indexById.set(entries[i]!.item.id, i);
-    }
-    for (let i = 0; i < entries.length; i++) {
-      const sequence = sequenceOf(entries[i]!);
-      if (sequence === undefined) continue;
-      const explicitIndex = sequence.predecessorId === undefined ? undefined : indexById.get(sequence.predecessorId);
-      const explicit = explicitIndex !== undefined
-        && sequenceOf(entries[explicitIndex]!)?.parentId === sequence.parentId
-        ? explicitIndex
-        : undefined;
-      const predecessor = explicit ?? lastByParent.get(sequence.parentId);
-      if (predecessor !== undefined) predecessorById.set(entries[i]!.item.id, predecessor);
-      lastByParent.set(sequence.parentId, i);
-    }
-
-    const candidates: Candidate[] = [];
-    for (let from = 0; from < entries.length; from++) {
-      const entry = entries[from]!;
-      const sequence = sequenceOf(entry);
-      if (sequence?.role !== "delta" || sequence.placement !== "fuse") continue;
-      const predecessor = predecessorById.get(entry.item.id);
-      if (predecessor === undefined) continue;
-      const target = predecessor + 1;
-      if (target === from || target === from + 1) continue;
-      const bill = interveningFromPrefix(prefix, from, target);
-      const credit = Math.max(0, sequence.migrationCreditTokens ?? 0);
-      const prior = previousMoves?.get(entry.item.id);
-      const proposed = { fromPosition: from + 1, toPosition: target + 1 };
-      const reversal = prior !== undefined
-        && prior.fromPosition === proposed.toPosition
-        && prior.toPosition === proposed.fromPosition;
-      candidates.push({ entry, from, target, bill, credit, accepted: credit >= bill, reversal });
-    }
+    // Follow-up #5 (2026-08-24): single scan implementation shared by the
+    // pass loop and the post-cap probe — the duplicated candidate logic
+    // could drift and silently diverge capped from what a further pass
+    // would actually accept.
+    const candidates = scanFuseCandidates(entries, prefix, previousMoves);
 
     candidates.sort((a, b) => {
       if (a.accepted !== b.accepted) return a.accepted ? -1 : 1;
@@ -305,10 +270,14 @@ export function planSequenceMoves(
 function hasAcceptableMove(entries: PositionEntry[]): boolean {
   const prefix = new Array<number>(entries.length + 1).fill(0);
   for (let i = 0; i < entries.length; i++) prefix[i + 1] = prefix[i]! + entries[i]!.option.tokens;
-  return scanFuseCandidates(entries, prefix).some((c) => c.accepted);
+  return scanFuseCandidates(entries, prefix, undefined).some((c) => c.accepted);
 }
 
-function scanFuseCandidates(entries: PositionEntry[], prefix: number[]): Candidate[] {
+function scanFuseCandidates(
+  entries: PositionEntry[],
+  prefix: number[],
+  previousMoves: ReadonlyMap<string, PriorMove> | undefined,
+): Candidate[] {
   const indexById = new Map<string, number>();
   for (let i = 0; i < entries.length; i++) indexById.set(entries[i]!.item.id, i);
   const predecessorById = new Map<string, number>();
@@ -336,7 +305,12 @@ function scanFuseCandidates(entries: PositionEntry[], prefix: number[]): Candida
     if (target === from || target === from + 1) continue;
     const bill = interveningFromPrefix(prefix, from, target);
     const credit = Math.max(0, sequence.migrationCreditTokens ?? 0);
-    candidates.push({ entry, from, target, bill, credit, accepted: credit >= bill, reversal: false });
+    const prior = previousMoves?.get(entry.item.id);
+    const proposed = { fromPosition: from + 1, toPosition: target + 1 };
+    const reversal = prior !== undefined
+      && prior.fromPosition === proposed.toPosition
+      && prior.toPosition === proposed.fromPosition;
+    candidates.push({ entry, from, target, bill, credit, accepted: credit >= bill, reversal });
   }
   return candidates;
 }

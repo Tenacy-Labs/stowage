@@ -268,4 +268,9 @@ STACK_REPRO completed at n=200,000                                              
 5. **Duplication:** `scanFuseCandidates` (`:309-341`) duplicates the pass-loop's predecessor/candidate logic (`:228-264`). Semantically identical today (verified line-by-line); extract a shared helper before the acceptance rule ever changes, or `capped` will drift again.
 6. **`suffixCount` via `max()` of evidence-array lengths (`src/solver.ts:766-770`):** over-scans phantom blocks when evidence arrays outlength `blockMass`/`blockCount` (malformed incumbents only); effect is conservative (withholds the cold discount). `blockMass?.length ?? blockCount` would be the exact bound.
 
+**Backlog resolution (2026-08-24, commits `28febf9` RED → fix commit):** items 3, 5, and 6 are now fixed on `feature/review-backlog`:
+- **#3/#4** — shared-credit path harmonized with MAJOR-4 per-block evidence semantics: fresh-snapshot no longer suppresses turn expiry for blocks without wall stamps; snapshot acts only when expired (mirrors `transactionCost`). RED test observed a fabricated −0.81 credit; post-fix it is 0.
+- **#5** — `scanFuseCandidates` is now the single candidate-scan implementation, shared by the pass loop and the post-cap probe (`previousMoves` wired for reversal detection). Invariant pinned by test: `capped === (a further call accepts a move)`.
+- **#6** — `suffixCount` clamped by `Math.min(..., blockCount)`; phantom stamps past the real block count can no longer warm (or chill) a suffix. RED test observed 0.84 (phantom-warmed); post-fix 0.30 own-cost collapse.
+
 **Merge verdict: APPROVE.** Follow-ups 1, 4, and 5 are worth a tidy-up PR; 2, 3, 6 are recorded for the backlog.
