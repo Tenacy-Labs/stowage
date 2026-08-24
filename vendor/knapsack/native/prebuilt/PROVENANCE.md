@@ -1,6 +1,6 @@
 # Prebuilt native dylibs — provenance
 
-Each `prebuilt/{triple}.dylib` is built from this directory's committed
+Each `prebuilt/{triple}{ext}` (ext per platform: `.dylib`/`.so`/`.dll`)
 source (`src/lib.rs`, `Cargo.toml`, `Cargo.lock`) with no external
 dependencies. Rebuild recipe (verified on this host):
 

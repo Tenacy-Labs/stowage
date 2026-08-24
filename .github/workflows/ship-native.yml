@@ -13,11 +13,6 @@ name: ship-native
 # never re-run host CI.
 on:
   workflow_dispatch:
-    inputs:
-      note:
-        description: "Optional note recorded in the artifact bundle"
-        required: false
-        default: ""
 
 permissions:
   contents: read
