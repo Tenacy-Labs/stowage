@@ -23,8 +23,8 @@ export interface SolveOptions {
    */
   readonly maxDpBytes?: number;
   /**
-   * DP kernel selection (2026-08-24, stowage perf item 2): "reference"
-   * (default) or "soa" — the structure-of-arrays kernel in dp-soa.ts.
+   * DP kernel selection (PR #5 default): "native" (default; compiled
+   * SIMD kernel, automatic soa fallback), "soa", or "reference".
    * Same recurrence, tie-breaking, and outputs; differential-tested in
    * stowage's test/dp-soa.test.ts. "soa" is exact; if the problem exceeds
    * maxDpBytes the reference divide-and-conquer path is used regardless.
@@ -174,9 +174,9 @@ export function solve(
   const optionsAfterFathoming = dpGroups.reduce((s, g) => s + g.options.length, 0);
 
   // 5. Exact DP.
-  // Perf item 2 (2026-08-24): SoA kernel when it fits in back-pointer
-  // memory; the reference path (incl. divide-and-conquer above the budget)
-  // remains the default and the fallback.
+  // Kernel dispatch (PR #5 default): native-first under budget with soa
+  // fallback; reference divide-and-conquer above the budget (all settings)
+  // and as the explicit opt-out.
   const resolvedDpBudget = options.maxDpBytes ?? DEFAULT_DP_BUDGET;
   // Bounded mode (2026-08-24, stowage perf item 1): when the exact DP table
   // would exceed the memory budget — the divide-and-conquer fallback's 2x

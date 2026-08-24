@@ -49,10 +49,11 @@ harnesses. Founding rulings: [ADR-0000](docs/adr/0000-charter.md).
 
 ## Performance
 
-The solver is exact by default. Nothing below changes an answer a user of
-the default options could observe — the perf work attacks only the
-over-budget regime, where exact relief previously stalled for tens of
-seconds.
+The solver is exact by default. The perf history below never changed an
+answer — only how fast it arrives. The native-first default (PR #5)
+changed which kernel serves the answer on DP-required problems
+(observed via `stats.dpKernelUsed`), not the answer itself:
+differential-proven identical outputs across all kernels.
 
 **What shipped (2026-08-24, PR #3, three review rounds):**
 
