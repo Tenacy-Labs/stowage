@@ -485,14 +485,18 @@ export function solve(items: Map<string, ContextItem>, incumbent: Incumbent, ps:
         if (snapshotWallExpired) {
           mass = 0;
         } else {
-          const hasSnapshotWall = ps.cache.ttlMs !== undefined && wallTimeMs !== undefined
-            && incumbent.cacheSnapshotWallTimeMs !== undefined;
           for (let i = prev.position; i < bm.length; i++) {
             const wallWrite = incumbent.blockWriteWallTimeMs?.[i];
             const hasBlockWall = ps.cache.ttlMs !== undefined && wallTimeMs !== undefined && wallWrite !== undefined;
             const wallExpired = hasBlockWall && wallTimeMs - wallWrite > ps.cache.ttlMs!;
             const turnWrite = incumbent.blockWriteTurns?.[i];
-            const turnExpired = !hasBlockWall && !hasSnapshotWall && turnWrite !== undefined
+            // Follow-up #4 (2026-08-24): per-block evidence, harmonized with
+            // the MAJOR-4 transactionCost semantics. A fresh snapshot no
+            // longer suppresses turn expiry for blocks without wall stamps —
+            // a snapshot only acts when EXPIRED (whole-cache cold), same as
+            // transactionCost. The old !hasSnapshotWall guard fabricated
+            // shared-bill credit in cold windows.
+            const turnExpired = !hasBlockWall && turnWrite !== undefined
               && turn - turnWrite > ps.cache.ttlTurns;
             if (wallExpired || turnExpired) mass -= bm[i]!;
           }
@@ -766,10 +770,16 @@ function transactionCost(item: ContextItem, o: RenderOption, prev: PrevRender | 
   // only when EVERY suffix block is expired under its own best evidence.
   // The prior global hasWallEvidence let one partial wall array suppress
   // the turn fallback for stamps it did not cover.
-  const suffixCount = Math.max(
-    (incumbent.blockWriteWallTimeMs?.length ?? 0),
-    (incumbent.blockWriteTurns?.length ?? 0),
-    incumbent.blockMass?.length ?? 0,
+  // Follow-up #6 (2026-08-24): evidence arrays may run past the REAL block
+  // count (malformed incumbent). Clamp the suffix scan to blockCount so
+  // phantom stamps cannot warm — or chill — blocks that do not exist.
+  const suffixCount = Math.min(
+    Math.max(
+      (incumbent.blockWriteWallTimeMs?.length ?? 0),
+      (incumbent.blockWriteTurns?.length ?? 0),
+      incumbent.blockMass?.length ?? 0,
+    ),
+    incumbent.blockCount,
   ) - prev.position;
   let expired = true;
   if (cache.ttlMs !== undefined && wallTimeMs !== undefined
