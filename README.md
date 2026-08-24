@@ -78,15 +78,17 @@ values at 10k groups reach 100–500M. Even in a rigged valid regime the
 rigged-best-case run produced 6.3M overflows, the wrong answer, and ran
 slower than int32 (48 vs 29 ms). int32 is the correctness floor.
 
-**Validated, deferred: Rust FFI kernel** (docs/spikes/002-rust-dp-ffi):
-an exact mirror of the SoA kernel as a Rust cdylib via `bun:ffi`.
-Differential: 400 problems, byte-identical. Wins concentrated where TS
-cannot go: memory-freedom regime 9.6x (tie-heavy 200k: 6 ms vs 53 ms
-divide-and-conquer); the wall shape 5k groups × 200k: 0.8 s vs 2.4 s
-(3.1x, via a 1 GB back-pointer table — production form would port
-Hirschberg D&C for O(capacity) memory). Shared-budget regime only
-1.3–1.4x — not worth an FFI dependency there. Decision pending: land in
-the knapsack repo as the over-budget path with TS as differential oracle.
+**Validated, deferred: Rust FFI kernel** (docs/spikes/002-rust-dp-ffi,
+003-simd): an exact mirror of the SoA kernel as a Rust cdylib via
+`bun:ffi`, with the SIMD follow-up. Differentials: 400 problems each,
+byte-identical. Spike 002 (scalar): memory-freedom regime 9.6x (tie-heavy
+200k: 6 ms vs 53 ms divide-and-conquer); wall 5k × 200k: 0.8 s vs 2.4 s.
+Spike 003 (loop-interchange + NEON auto-vectorization, i32::MIN
+sentinel): **3.2 ms vs 9.2 ms TypeScript at 30k = 4.2x; 585 ms at the
+wall = 6.9x vs TS D&C**. Shared-budget regime is where the win now lives
+too. Production notes: land in the knapsack repo with TS as differential
+oracle; Hirschberg D&C port for O(capacity) memory at the wall. Decision
+pending owner ruling.
 
 ## Status
 
