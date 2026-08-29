@@ -1,0 +1,9 @@
+#!/bin/sh
+# Full test gate before push (mirrors CI): bun test runs the unit and
+# integration suites in test/ (including the port/integration files that
+# exercise the @tenacy-labs/knapsack dependency end-to-end).
+if [ ! -f ./bun.lock ]; then
+  echo "pre-push: not run from repo root — cd there first." >&2
+  exit 1
+fi
+exec bun test

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Static type gate (mirrors CI): full-project tsc, no emit.
+# Invoked via bun because plain `bunx tsc` links against the host node
+# on some machines (libuv dyld failures); the repo's working form is
+# `bun ./node_modules/typescript/bin/tsc --noEmit`.
+if [ ! -f ./node_modules/typescript/bin/tsc ]; then
+  echo "pre-commit: node_modules/typescript missing — run 'bun install' first." >&2
+  exit 1
+fi
+exec bun ./node_modules/typescript/bin/tsc --noEmit
