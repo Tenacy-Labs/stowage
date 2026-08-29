@@ -1,11 +1,11 @@
-# @connectotron/knapsack
+# @tenacy-labs/knapsack
 
 Exact **multiple-choice knapsack problem (MCKP)** solver in pure TypeScript.
 Zero dependencies, integer-exact bounds, deterministic output, built for
 latency-sensitive in-process use: pick one option per group under a weight
 budget, maximize total profit — proven optimal, every time.
 
-Born from [agent-kernel](https://github.com/Connectotron/agent-kernel)'s
+Born from [agent-kernel](https://github.com/tenacy-labs/agent-kernel)'s
 per-turn context optimizer (ADR-0005: the render solve *is* an MCKP),
 extracted as a standalone component for pure focus on mathematical structure
 and implementation efficiency. First consumer: agent-kernel; the library
@@ -24,7 +24,7 @@ weight = tokens, C = the turn budget, profit = utility.
 ## API
 
 ```ts
-import { solve } from "@connectotron/knapsack";
+import { solve } from "@tenacy-labs/knapsack";
 
 const result = solve({
   groups: [
