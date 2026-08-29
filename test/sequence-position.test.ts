@@ -197,7 +197,7 @@ describe("virtual head block (tool-def prefix)", () => {
     const cm = new CacheModel(headParams());
     const blocks = [{ digest: "a", tokens: 100, text: "", itemId: "x", zone: "identity" as const }];
     cm.setHeadBlock({ digest: "tool-defs-v1", tokens: 2100 });
-    expect(cm.headBlockTokens()).toBe(2100);
+    expect(cm.headBlock()).toEqual({ digest: "tool-defs-v1", tokens: 2100 });
     // No prior turn: chain empty, but the head matches itself (re-sent every
     // request) — expected hit includes it immediately.
     const h0 = cm.expectedHit(blocks);
@@ -214,7 +214,7 @@ describe("virtual head block (tool-def prefix)", () => {
     // query now credits only the matched block (expectedHit is pure — the
     // earlier z-query did not mutate the chain).
     cm.setHeadBlock(null);
-    expect(cm.headBlockTokens()).toBe(0);
+    expect(cm.headBlock()).toBe(null);
     expect(cm.expectedHit(blocks).hitTokens).toBe(100);
   });
 

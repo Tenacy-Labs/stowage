@@ -71,6 +71,13 @@ export class CacheModel {
     this.head = head === null ? null : { ...head, turn: this.turn };
   }
 
+  /** The installed head as a plain record (digest + tokens), or null.
+   *  Symmetric getter for setHeadBlock — lets callers display or persist
+   *  the believed tool-prefix without re-probing. */
+  headBlock(): { digest: string; tokens: number } | null {
+    return this.head === null ? null : { digest: this.head.digest, tokens: this.head.tokens };
+  }
+
   headBlockTokens(): number {
     return this.head?.tokens ?? 0;
   }
