@@ -10,6 +10,27 @@ stability (provider cache-prefix continuity), shifting cargo mid-voyage
 costs real money (transaction costs), and the plan is revised at each
 port of call (every turn).
 
+
+## Install
+
+Published to GitHub Packages as `@tenacy-labs/stowage`. Point the scope at
+the registry and authenticate with a GitHub token (classic PAT with
+`read:packages`, or a fine-grained token with package read on the org):
+
+```ini
+# .npmrc
+@tenacy-labs:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+```
+
+```sh
+bun add @tenacy-labs/stowage    # or: npm install @tenacy-labs/stowage
+```
+
+Runtime expectation: bun (or any bundler that compiles TypeScript). The
+package ships its TypeScript source directly. The `@tenacity-labs/knapsack`
+dependency resolves from its public GitHub repo — no token needed for it.
+
 ## What it is
 
 A **price-coupled decomposition** over three axes with different

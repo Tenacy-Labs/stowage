@@ -41,3 +41,18 @@ Don't — CI runs the same gates and will catch it.
   locked by `bun.lock`. Its own test suite runs in its repo, not here.
 - The dependency's internals (SoA differential, native loader) are covered upstream;
   tests here consume only its public API.
+
+## Releases
+
+Release Please drives versions: conventional commits (`feat:`, `fix:`) on
+main keep a release PR open; **merging that PR is the release gesture** —
+it bumps the version, updates `CHANGELOG.md`, tags `v*`, and the Release
+workflow publishes to GitHub Packages after re-running the full gates.
+Tripwires:
+
+- Don't hand-edit `version` or `.release-please-manifest.json`; the release
+  PR owns them.
+- `chore:`/`ci:`/`docs:` commits do not trigger releases.
+- Manual `git tag v*` + push is a publish (fallback path) — avoid.
+- Consumers install from GitHub Packages (see README "Install"); the
+  `@tenacy-labs` scope must map to `npm.pkg.github.com` in their `.npmrc`.

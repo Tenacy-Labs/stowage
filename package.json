@@ -11,6 +11,14 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "scripts": {
     "typecheck": "bunx tsc --noEmit",
     "test": "bun test"
