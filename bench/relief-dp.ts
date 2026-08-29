@@ -13,7 +13,7 @@
 // The wall is NOT confined to tied geometry: genuinely over-budget fresh
 // content at full-window scale hits it too (reviewer counterfactual, PR #3).
 // LANDED ANSWER (perf item 1): bounded relief mode. Above the 50 MiB DP
-// budget the vendor returns the certified integral greedy incumbent with
+// budget knapsack returns the certified integral greedy incumbent with
 // honest [greedyLower, lpUpper] bounds (status "bounded", never "optimal")
 // — measured ~1.6s at 10k groups / 900k capacity vs 37-42s exact. Below
 // the budget, behavior is byte-identical to exact. Quantization (Q-token

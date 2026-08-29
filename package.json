@@ -17,7 +17,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@tenacy-labs/knapsack": "file:vendor/knapsack"
+    "@tenacy-labs/knapsack": "github:Tenacy-Labs/knapsack#v0.3.0"
   },
   "devDependencies": {
     "@types/bun": "^1.4.0",

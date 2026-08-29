@@ -703,10 +703,10 @@ function exactMckpRelief(
     return { id: c.item.id, options: opts };
   });
 
-  // Bounded relief (2026-08-24, perf item 1): below the vendor's 50 MiB DP
+  // Bounded relief (2026-08-24, perf item 1): below knapsack's 50 MiB DP
   // budget this is byte-identical to exact (the bounded branch never
   // engages). Above it — genuinely over-budget full windows, measured
-  // 7.6-15.2B DP cells / 37-42s in divide-and-conquer mode — the vendor
+  // 7.6-15.2B DP cells / 37-42s in divide-and-conquer mode — knapsack
   // returns the certified integral greedy incumbent with honest
   // [greedyLower, lpUpper] bounds (status "bounded"), never "optimal".
   const res = solveMckp({ groups, capacity }, { reliefMode: "bounded" });

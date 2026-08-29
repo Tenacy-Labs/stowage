@@ -1,11 +1,10 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 1,
   "workspaces": {
     "": {
       "name": "@tenacy-labs/stowage",
       "dependencies": {
-        "@tenacy-labs/knapsack": "file:vendor/knapsack",
+        "@tenacy-labs/knapsack": "github:Tenacy-Labs/knapsack#v0.3.0",
       },
       "devDependencies": {
         "@types/bun": "^1.4.0",
@@ -14,7 +13,7 @@
     },
   },
   "packages": {
-    "@tenacy-labs/knapsack": ["@tenacy-labs/knapsack@file:vendor/knapsack", { "devDependencies": { "@types/bun": "^1.4.0", "typescript": "5.9.2" } }],
+    "@tenacy-labs/knapsack": ["@tenacy-labs/knapsack@github:Tenacy-Labs/knapsack#03f72bc", {}, "Tenacy-Labs-knapsack-03f72bc"],
 
     "@types/bun": ["@types/bun@1.4.0", "", { "dependencies": { "bun-types": "1.4.0" } }, "sha512-K+lZULY23vRgK/CfTjFIV+tyifaNdSMlPh9j+6mQ/cLfpOznLyAuzgV/JQysyECpkBQLVMSyvjlr2fBUSA9wFQ=="],
 

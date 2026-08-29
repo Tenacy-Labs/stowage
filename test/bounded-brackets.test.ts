@@ -6,8 +6,7 @@
 // found by seeded xorshift search - this file is machine-generated from
 // that search, /tmp/r21gen.ts). Fix: lpUpper = max(lp.upperBound,
 // walk.break.upperBound) - the hull LP is already computed at solve.ts:78.
-import { solve } from "../vendor/knapsack/src/solve.ts";
-import type { KnapsackProblem } from "../vendor/knapsack/src/types.ts";
+import { solve, type KnapsackProblem } from "@tenacy-labs/knapsack";
 import { test, expect } from "bun:test";
 
 const CASES: KnapsackProblem[] = [

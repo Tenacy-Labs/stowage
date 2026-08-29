@@ -81,7 +81,7 @@ slower than int32 (48 vs 29 ms). int32 is the correctness floor.
 
 **Shipped: native SIMD kernel** (PR #4 + #5, 2026-08-24; docs/spikes/002,
 003): the spike-003 kernel productionized. A Rust cdylib
-(`vendor/knapsack/native`) mirrors the SoA DP exactly — same recurrence,
+(`native/` in the knapsack repo) mirrors the SoA DP exactly — same recurrence,
 windowing, tie-breaks, budget gate — compiled for baseline vector widths
 only (NEON on aarch64, SSE2-class auto-vectorization on x86_64; no AVX
 assumptions). **Default policy (PR #5): `solve()` prefers the compiled
@@ -97,15 +97,15 @@ fallback path visibly. Review round 2 caught a process-abort class
 flatten) — root-fixed by an exact weight>capacity filter before the DP
 in all kernels, plus in-kernel validation (rc −3) and catch_unwind
 containment (rc −4); both placements carry regression tests. Prebuilt
-dylib provenance: `vendor/knapsack/native/prebuilt/PROVENANCE.md`.
+dylib provenance: the `knapsack` repo's `native/prebuilt/PROVENANCE.md`.
 ## Status
 
 **v0.1.0 — solver ported, sequence axis landed.** The full ex-agent-kernel
 solve core (selection, suffix pricing, horizons, evidence, cache model,
 params, contract types — ~1,500 lines) runs here, byte-identical, over the
-vendored `@tenacy-labs/knapsack`; agent-kernel consumes it via
-`file:vendor/stowage` re-export shims (its 869-test suite remains the
-port's acceptance test).
+`@tenacy-labs/knapsack` dependency (`github:Tenacy-Labs/knapsack`, pinned
+to tag `v0.3.0`). Kernel-internal coverage (SoA differential, native
+loader) lives in the knapsack repo's own suite.
 
 [ADR-0001](docs/adr/0001-sequence-position-semantics.md) — the sequence
 position axis — has landed: sequence-aware normalization (canonical

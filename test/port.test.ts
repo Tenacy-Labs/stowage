@@ -1,6 +1,6 @@
 /**
  * Port pin — the solver runs unchanged on stowage's tree (ex-agent-kernel
- * optimizer core, byte-identical modulo import heads). Proves the vendor
+ * optimizer core, byte-identical modulo import heads). Proves the dependency
  * wiring end-to-end: knapsack relief path, suffix pricing, ledger shape.
  */
 import { describe, test, expect } from "bun:test";
