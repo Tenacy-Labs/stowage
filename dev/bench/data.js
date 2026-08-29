@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1788037424583,
+  "lastUpdate": 1788042598004,
   "repoUrl": "https://github.com/Tenacy-Labs/stowage",
   "entries": {
     "relief-dp": [
@@ -384,6 +384,54 @@ window.BENCHMARK_DATA = {
             "value": 1.349,
             "unit": "ms",
             "extra": "med 1.427 ms over 3 reps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "robottwo@users.noreply.github.com",
+            "name": "Daniel Eisner",
+            "username": "robottwo"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3c8adecc65cc935e224699a8a5fbd223d4aad6be",
+          "message": "Merge pull request #16 from Tenacy-Labs/fix/knapsack-0.3.1\n\nfix: bump @tenacity-labs/knapsack to v0.3.1 — frontier contract in bounded relief mode",
+          "timestamp": "2026-08-29T18:29:42-04:00",
+          "tree_id": "05768ec71a963b28b975dec97aa35be5c1f3f9a5",
+          "url": "https://github.com/Tenacy-Labs/stowage/commit/3c8adecc65cc935e224699a8a5fbd223d4aad6be"
+        },
+        "date": 1788042597549,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "relief-dp win-4k (n=40, budget=4000)",
+            "value": 1.283,
+            "unit": "ms",
+            "extra": "med 1.329 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-30k (n=300, budget=30000)",
+            "value": 10.264,
+            "unit": "ms",
+            "extra": "med 12.130 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-200k (n=500, budget=200000)",
+            "value": 1.967,
+            "unit": "ms",
+            "extra": "med 2.294 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-1M (n=1000, budget=1000000)",
+            "value": 1.269,
+            "unit": "ms",
+            "extra": "med 1.898 ms over 3 reps"
           }
         ]
       }
