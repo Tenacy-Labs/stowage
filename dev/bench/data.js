@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1788036913600,
+  "lastUpdate": 1788037424583,
   "repoUrl": "https://github.com/Tenacy-Labs/stowage",
   "entries": {
     "relief-dp": [
@@ -336,6 +336,54 @@ window.BENCHMARK_DATA = {
             "value": 1.998,
             "unit": "ms",
             "extra": "med 2.442 ms over 3 reps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "robottwo@users.noreply.github.com",
+            "name": "Daniel Eisner",
+            "username": "robottwo"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8407519f86f62f90e17da9dc7f29e80fae3928f6",
+          "message": "Merge pull request #15 from Tenacy-Labs/docs/gates-note\n\ndocs: required checks + auto-merge on main",
+          "timestamp": "2026-08-29T17:03:31-04:00",
+          "tree_id": "12fdd7e6ed5aa5cef1b0be8e739e6ab0b5cd1483",
+          "url": "https://github.com/Tenacy-Labs/stowage/commit/8407519f86f62f90e17da9dc7f29e80fae3928f6"
+        },
+        "date": 1788037423764,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "relief-dp win-4k (n=40, budget=4000)",
+            "value": 1.324,
+            "unit": "ms",
+            "extra": "med 1.389 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-30k (n=300, budget=30000)",
+            "value": 9.573,
+            "unit": "ms",
+            "extra": "med 11.370 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-200k (n=500, budget=200000)",
+            "value": 1.692,
+            "unit": "ms",
+            "extra": "med 1.919 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-1M (n=1000, budget=1000000)",
+            "value": 1.349,
+            "unit": "ms",
+            "extra": "med 1.427 ms over 3 reps"
           }
         ]
       }
