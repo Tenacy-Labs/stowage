@@ -138,3 +138,29 @@ jobs:
           summary-always: true
           alert-threshold: "200%"
           fail-on-alert: false
+
+  # Prove the SHIPPED ARTIFACT works: pack the repo as the npm tarball,
+  # install it in a scratch project (which must re-resolve the
+  # @tenacy-labs/knapsack git dependency on its own), and run the
+  # consumer harness against the public API. Covers what the in-repo
+  # suite cannot: package.json exports/files correctness, tarball
+  # contents, and dependency wiring outside the repo checkout.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Pack
+        run: npm pack --pack-destination "$RUNNER_TEMP"
+      - name: Consume packed artifact in a fresh project
+        run: |
+          mkdir "$RUNNER_TEMP/consumer" && cd "$RUNNER_TEMP/consumer"
+          echo '{"name":"consumer","private":true,"type":"module"}' > package.json
+          cp "$GITHUB_WORKSPACE/e2e/consumer.ts" .
+          bun add "$RUNNER_TEMP"/tenacy-labs-stowage-*.tgz
+          bun run consumer.ts

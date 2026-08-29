@@ -15,5 +15,5 @@
     "skipLibCheck": true,
     "allowImportingTsExtensions": true
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "bench", "scripts", "e2e"]
 }
