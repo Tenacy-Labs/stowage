@@ -5,9 +5,15 @@ on:
     branches: [main, uat]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      # dorny/test-reporter publishes results as a Check Run on the commit/PR.
+      checks: write
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -19,4 +25,89 @@ jobs:
       # silent regeneration.
       - run: bun install --frozen-lockfile
       - run: bunx tsc --noEmit
-      - run: bun test
+      # One run, two outputs: JUnit XML for the Check Run + raw artifact,
+      # lcov for the coverage summary + raw artifact.
+      - name: Test (junit + lcov)
+        run: >
+          bun test
+          --reporter=junit --reporter-outfile=test-results.xml
+          --coverage --coverage-reporter=lcov --coverage-dir=coverage
+      - name: Upload test results artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: test-results.xml
+      - name: Upload coverage artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: coverage/lcov.info
+      - name: Coverage summary
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo "## Code coverage"
+            bun scripts/coverage-summary.ts coverage/lcov.info
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish test results (Check Run)
+        if: ${{ !cancelled() }}
+        uses: dorny/test-reporter@v3
+        with:
+          name: Unit tests
+          path: test-results.xml
+          reporter: java-junit
+
+  bench:
+    # PRs: cache-backed history, comparison summary + PR comment, no writes
+    # to tracked branches. main: history + charts on the gh-pages branch.
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write      # gh-pages benchmark history
+      deployments: write   # gh-pages deployment
+      pull-requests: write # comment-always
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - name: Run bench
+        run: bun bench/relief-dp.ts --json > bench.json
+      - name: Restore PR bench history
+        if: github.event_name == 'pull_request'
+        uses: actions/cache@v4
+        with:
+          path: ./cache
+          key: benchmark-data-${{ runner.os }}
+      - name: Track bench result (PR)
+        if: github.event_name == 'pull_request'
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: relief-dp
+          tool: customSmallerIsBetter
+          output-file-path: bench.json
+          external-data-json-path: ./cache/benchmark-data.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment-always: true
+          summary-always: true
+          # Display + track only: ubuntu runners are too noisy to gate on.
+          alert-threshold: "200%"
+          fail-on-alert: false
+      - name: Track bench result (main)
+        if: github.event_name == 'push'
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: relief-dp
+          tool: customSmallerIsBetter
+          output-file-path: bench.json
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: dev/bench
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          comment-always: true
+          summary-always: true
+          alert-threshold: "200%"
+          fail-on-alert: false

@@ -24,7 +24,7 @@
 // line does NOT fire relief under stale-item phase-1 rejection and is kept
 // only as the phase-1-fast-path baseline.
 //
-// Run: bun bench/relief-dp.ts
+// Run: bun bench/relief-dp.ts [--json]
 import { solve, paramSetV1 } from "../src/index.ts";
 import type { ContextItem } from "../src/index.ts";
 
@@ -52,10 +52,22 @@ function run(label: string, nItems: number, itemTokens: number, budget: number, 
     times.push(performance.now() - t0);
   }
   times.sort((a, b) => a - b);
-  console.log(`${label}: n=${nItems} tok/item=${itemTokens} budget=${budget} -> min ${times[0]!.toFixed(1)} ms / med ${times[Math.floor(reps / 2)]!.toFixed(1)} ms`);
+  const min = times[0]!;
+  const med = times[Math.floor(reps / 2)]!;
+  console.error(`${label}: n=${nItems} tok/item=${itemTokens} budget=${budget} -> min ${min.toFixed(1)} ms / med ${med.toFixed(1)} ms`);
+  return { name: `relief-dp ${label.trim()} (n=${nItems}, budget=${budget})`, unit: "ms", value: Number(min.toFixed(3)), extra: `med ${med.toFixed(3)} ms over ${reps} reps` };
 }
 
-run("win-4k  ", 40, 150, 4_000);
-run("win-30k ", 300, 150, 30_000);
-run("win-200k", 500, 500, 200_000);
-run("win-1M  ", 1000, 1000, 1_000_000);
+const runs = [
+  run("win-4k  ", 40, 150, 4_000),
+  run("win-30k ", 300, 150, 30_000),
+  run("win-200k", 500, 500, 200_000),
+  run("win-1M  ", 1000, 1000, 1_000_000),
+];
+
+// --json: emit the github-action-benchmark "customSmallerIsBetter"
+// format on stdout (human-readable lines go to stderr) so CI can pipe
+// stdout straight into the benchmark tracker.
+if (process.argv.includes("--json")) {
+  console.log(JSON.stringify(runs));
+}
