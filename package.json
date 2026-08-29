@@ -1,6 +1,6 @@
 {
   "name": "@tenacy-labs/stowage",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Context-layout solver — joint representation × position × timing optimization for LLM context windows (price-coupled decomposition over @tenacy-labs/knapsack)",
   "license": "Apache-2.0",
   "type": "module",
