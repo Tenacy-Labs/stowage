@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1788042871205,
+  "lastUpdate": 1788044492408,
   "repoUrl": "https://github.com/Tenacy-Labs/stowage",
   "entries": {
     "relief-dp": [
@@ -480,6 +480,54 @@ window.BENCHMARK_DATA = {
             "value": 2.817,
             "unit": "ms",
             "extra": "med 3.027 ms over 3 reps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "robottwo@users.noreply.github.com",
+            "name": "Daniel Eisner",
+            "username": "robottwo"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0767e90ded5bdd15c02c283357449e17bdfc3723",
+          "message": "Merge pull request #18 from Tenacy-Labs/ci/release-please-pat\n\nci: release-please PAT token with GITHUB_TOKEN fallback",
+          "timestamp": "2026-08-29T19:01:17-04:00",
+          "tree_id": "97dc3b13eb42de5df45e03523b9690ed88e4a228",
+          "url": "https://github.com/Tenacy-Labs/stowage/commit/0767e90ded5bdd15c02c283357449e17bdfc3723"
+        },
+        "date": 1788044491495,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "relief-dp win-4k (n=40, budget=4000)",
+            "value": 1.743,
+            "unit": "ms",
+            "extra": "med 1.899 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-30k (n=300, budget=30000)",
+            "value": 14.816,
+            "unit": "ms",
+            "extra": "med 17.429 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-200k (n=500, budget=200000)",
+            "value": 2.438,
+            "unit": "ms",
+            "extra": "med 2.541 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-1M (n=1000, budget=1000000)",
+            "value": 2.047,
+            "unit": "ms",
+            "extra": "med 2.517 ms over 3 reps"
           }
         ]
       }
