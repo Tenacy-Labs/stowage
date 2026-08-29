@@ -21,6 +21,8 @@ Hooks live in `.githooks/` (version-controlled); the `core.hooksPath` line above
 
 CI additionally gates coverage (`scripts/coverage-gate.ts`): total line coverage must not decrease vs the base, and new `src/` lines must be ≥ 80% covered (files never loaded by tests count as fully uncovered).
 
+`main` requires the CI jobs (`test`, `bench`, `e2e`) as status checks; PRs marked auto-merge land once they pass (`gh pr merge --auto --merge`).
+
 Also: `bun run bench/relief-dp.ts` — relief-DP wall measurement.
 
 ## Repo facts
