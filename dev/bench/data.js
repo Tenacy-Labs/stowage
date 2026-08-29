@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1788036558061,
+  "lastUpdate": 1788036821624,
   "repoUrl": "https://github.com/Tenacy-Labs/stowage",
   "entries": {
     "relief-dp": [
@@ -240,6 +240,54 @@ window.BENCHMARK_DATA = {
             "value": 2.161,
             "unit": "ms",
             "extra": "med 2.203 ms over 3 reps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "robottwo@users.noreply.github.com",
+            "name": "Daniel Eisner",
+            "username": "robottwo"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f17bb43e8d68b9f25d3cd6b5147d8b41a2d263e4",
+          "message": "Merge pull request #14 from Tenacy-Labs/test/evidence-invariants\n\ntest: evidence module invariants — λ posterior, factor clamps, Beta variance guards",
+          "timestamp": "2026-08-29T16:53:28-04:00",
+          "tree_id": "15478c41e51ecf739fa74f9dd5637c4a5a8896c0",
+          "url": "https://github.com/Tenacy-Labs/stowage/commit/f17bb43e8d68b9f25d3cd6b5147d8b41a2d263e4"
+        },
+        "date": 1788036820760,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "relief-dp win-4k (n=40, budget=4000)",
+            "value": 1.463,
+            "unit": "ms",
+            "extra": "med 1.970 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-30k (n=300, budget=30000)",
+            "value": 14.9,
+            "unit": "ms",
+            "extra": "med 17.453 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-200k (n=500, budget=200000)",
+            "value": 2.101,
+            "unit": "ms",
+            "extra": "med 2.319 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-1M (n=1000, budget=1000000)",
+            "value": 2.555,
+            "unit": "ms",
+            "extra": "med 2.770 ms over 3 reps"
           }
         ]
       }
