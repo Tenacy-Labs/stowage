@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/Tenacy-Labs/stowage/compare/v0.3.0...v0.3.1) (2026-08-29)
+
+
+### Bug Fixes
+
+* bump @tenacity-labs/knapsack to v0.3.1 — frontier contract in bounded relief mode ([3c8adec](https://github.com/Tenacy-Labs/stowage/commit/3c8adecc65cc935e224699a8a5fbd223d4aad6be))
+* bump @tenacity-labs/knapsack to v0.3.1 — frontier contract in bounded relief mode ([7d531a3](https://github.com/Tenacy-Labs/stowage/commit/7d531a3de9a858856c1612b2a3a05967ebec89cb))
+
 ## [0.3.0](https://github.com/Tenacy-Labs/stowage/compare/v0.2.0...v0.3.0) (2026-08-29)
 
 
