@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1788035721325,
+  "lastUpdate": 1788036558061,
   "repoUrl": "https://github.com/Tenacy-Labs/stowage",
   "entries": {
     "relief-dp": [
@@ -192,6 +192,54 @@ window.BENCHMARK_DATA = {
             "value": 2.755,
             "unit": "ms",
             "extra": "med 3.016 ms over 3 reps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "robottwo@users.noreply.github.com",
+            "name": "Daniel Eisner",
+            "username": "robottwo"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3320a28b929e9a217148dc4dde6dfee5413f8a90",
+          "message": "Merge pull request #12 from Tenacy-Labs/feat/head-block-getter\n\nfeat: CacheModel.headBlock() — symmetric getter for the installed head",
+          "timestamp": "2026-08-29T16:49:09-04:00",
+          "tree_id": "a52db586b1963ba24a558f3ce4d8c4c1dff9025a",
+          "url": "https://github.com/Tenacy-Labs/stowage/commit/3320a28b929e9a217148dc4dde6dfee5413f8a90"
+        },
+        "date": 1788036557489,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "relief-dp win-4k (n=40, budget=4000)",
+            "value": 1.66,
+            "unit": "ms",
+            "extra": "med 1.857 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-30k (n=300, budget=30000)",
+            "value": 13.492,
+            "unit": "ms",
+            "extra": "med 15.210 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-200k (n=500, budget=200000)",
+            "value": 2.405,
+            "unit": "ms",
+            "extra": "med 2.482 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-1M (n=1000, budget=1000000)",
+            "value": 2.161,
+            "unit": "ms",
+            "extra": "med 2.203 ms over 3 reps"
           }
         ]
       }
