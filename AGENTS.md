@@ -10,9 +10,9 @@ git config core.hooksPath .githooks      # activate the gates below (per clone)
 ## Git hooks
 
 Hooks live in `.githooks/` and are version-controlled; the `git config
-core.hooksPath .githooks` line above is the only activation step. Both
-hooks mirror CI (`.github/workflows/ci.yml`) — a green local hook means a
-green CI run.
+core.hooksPath .githooks` line above is the only activation step. The
+type and test hooks mirror CI (`.github/workflows/ci.yml`) — a green
+local hook means a green CI run.
 
 - **pre-commit — static type check.** Runs `bun ./node_modules/typescript/bin/tsc --noEmit`
   (the repo's strict `tsc` gate; see the note in `.githooks/pre-commit` about why it is
@@ -21,6 +21,10 @@ green CI run.
   `test/`: unit tests plus the integration/port tests that drive `solve()` end-to-end
   against the `@tenacy-labs/knapsack` dependency (relief path, suffix pricing, ledger
   shape, sequence axis).
+- **commit-msg — conventional-commit prefix.** Rejects any commit whose subject
+  lacks a conventional type (`feat:`, `fix:`, `chore:`, …, with optional `(scope)`
+  and `!`). Message enforcement cannot live in pre-commit (the message does not
+  exist yet at that stage); merge/revert/fixup machinery is exempt.
 
 Emergency bypass (same as always): `git commit --no-verify` / `git push --no-verify`.
 Don't — CI runs the same gates and will catch it.
@@ -44,10 +48,13 @@ Don't — CI runs the same gates and will catch it.
 
 ## Releases
 
-Release Please drives versions: conventional commits (`feat:`, `fix:`) on
-main keep a release PR open; **merging that PR is the release gesture** —
-it bumps the version, updates `CHANGELOG.md`, tags `v*`, and the Release
-workflow publishes to GitHub Packages after re-running the full gates.
+Release Please drives versions from conventional-commit prefixes — every
+commit and PR title starts with a type (`feat:`, `fix:`, `chore:`, …), enforced
+on commits by the `commit-msg` hook. `feat:`/`fix:` commits on main keep a
+release PR open; **merging that PR is the release gesture** — it bumps the
+version, updates `CHANGELOG.md`, tags `v*`, and the Release workflow publishes
+to GitHub Packages after re-running the full gates.
+
 Tripwires:
 
 - Don't hand-edit `version` or `.release-please-manifest.json`; the release

@@ -1,0 +1,27 @@
+#!/bin/sh
+# Conventional-commit prefix gate: every commit message must start with a
+# type prefix — feat:/fix:/docs:/style:/refactor:/perf:/test:/build:/ci:/
+# chore:/revert: — optionally scoped (feat(core):) or breaking (feat!:).
+# Release Please decides releases and changelog entries from these
+# prefixes (see AGENTS.md "Releases"), so a commit without one is
+# invisible to the release machinery.
+#
+# This is a commit-msg hook, not pre-commit: pre-commit runs before the
+# message exists. Git-generated lines (Merge/Revert/fixup!/squash!) are
+# exempt; merge commits never reach commit-msg anyway (`git merge` does
+# not invoke it).
+commit_regex='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9_./-]+\))?(!)?: .+'
+
+first=$(head -n 1 "$1")
+
+case "$first" in
+  "Merge "*|"Revert "*|fixup!*|squash!*) exit 0 ;;
+esac
+
+if ! printf '%s\n' "$first" | grep -Eq "$commit_regex"; then
+  echo "commit-msg: subject must start with a conventional type:" >&2
+  echo "  (feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(scope)?(!): subject" >&2
+  echo "  got: $first" >&2
+  echo "Release Please only sees commits that carry one of these prefixes." >&2
+  exit 1
+fi
