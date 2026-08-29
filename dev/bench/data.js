@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1788035288382,
+  "lastUpdate": 1788035721325,
   "repoUrl": "https://github.com/Tenacy-Labs/stowage",
   "entries": {
     "relief-dp": [
@@ -144,6 +144,54 @@ window.BENCHMARK_DATA = {
             "value": 1.102,
             "unit": "ms",
             "extra": "med 1.126 ms over 3 reps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "robottwo@gmail.com",
+            "name": "Daniel Eisner",
+            "username": "robottwo"
+          },
+          "committer": {
+            "email": "robottwo@gmail.com",
+            "name": "Daniel Eisner",
+            "username": "robottwo"
+          },
+          "distinct": true,
+          "id": "dba87afd84e87f2b2be663c65874526b14e4b2cc",
+          "message": "feat: virtual head block in CacheModel — tool-def prefix tokens ride the believed chain\n\nProviders render tool definitions as a prefix before the system prompt:\ntokens present in every request and part of the provider-side cache chain,\nbut outside stowage's render blocks. setHeadBlock() installs that\nprobe-measured prefix as a virtual block at position 0:\n\n- rides both sides of expectedHit (re-sent verbatim, always self-matches);\n- freshness advances with update() (turn clock only — tool defs never\n  realistically age out);\n- virtual only: believedChain() stays head-free; calibrate() untouched —\n  head tokens flow through classification via expectedHit as before;\n- setHeadBlock(null) restores plain block-prefix semantics.\n\nAdditive API; no-head behavior is bit-identical (full prior suite green\nunchanged). Includes the two ported invariant tests from tenacy's\nproduction-tested vendored copy.",
+          "timestamp": "2026-08-29T16:33:24-04:00",
+          "tree_id": "f9ec4c0b4c92d4d400954817831dca0d79a14bdc",
+          "url": "https://github.com/Tenacy-Labs/stowage/commit/dba87afd84e87f2b2be663c65874526b14e4b2cc"
+        },
+        "date": 1788035720819,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "relief-dp win-4k (n=40, budget=4000)",
+            "value": 1.963,
+            "unit": "ms",
+            "extra": "med 2.102 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-30k (n=300, budget=30000)",
+            "value": 15.955,
+            "unit": "ms",
+            "extra": "med 19.412 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-200k (n=500, budget=200000)",
+            "value": 2.584,
+            "unit": "ms",
+            "extra": "med 2.920 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-1M (n=1000, budget=1000000)",
+            "value": 2.755,
+            "unit": "ms",
+            "extra": "med 3.016 ms over 3 reps"
           }
         ]
       }
