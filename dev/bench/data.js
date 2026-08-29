@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1788034787670,
+  "lastUpdate": 1788035288382,
   "repoUrl": "https://github.com/Tenacy-Labs/stowage",
   "entries": {
     "relief-dp": [
@@ -96,6 +96,54 @@ window.BENCHMARK_DATA = {
             "value": 2.955,
             "unit": "ms",
             "extra": "med 3.215 ms over 3 reps"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "robottwo@users.noreply.github.com",
+            "name": "Daniel Eisner",
+            "username": "robottwo"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bc5498fb89a4d6a152c428d8c6d899ceda5d4746",
+          "message": "Merge pull request #11 from Tenacy-Labs/ci/e2e-stage\n\nci: e2e stage — pack artifact, consume in scratch project",
+          "timestamp": "2026-08-29T16:27:55-04:00",
+          "tree_id": "48503c5ef4f76af048114cf294994b3d38ed5f3e",
+          "url": "https://github.com/Tenacy-Labs/stowage/commit/bc5498fb89a4d6a152c428d8c6d899ceda5d4746"
+        },
+        "date": 1788035287525,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "relief-dp win-4k (n=40, budget=4000)",
+            "value": 1.347,
+            "unit": "ms",
+            "extra": "med 1.904 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-30k (n=300, budget=30000)",
+            "value": 10.321,
+            "unit": "ms",
+            "extra": "med 12.002 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-200k (n=500, budget=200000)",
+            "value": 1.655,
+            "unit": "ms",
+            "extra": "med 1.740 ms over 3 reps"
+          },
+          {
+            "name": "relief-dp win-1M (n=1000, budget=1000000)",
+            "value": 1.102,
+            "unit": "ms",
+            "extra": "med 1.126 ms over 3 reps"
           }
         ]
       }
