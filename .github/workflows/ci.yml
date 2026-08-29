@@ -16,6 +16,9 @@ jobs:
       checks: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Full history: the coverage gate diffs against the merge-base.
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
           # Pinned to match @tenacity-labs/knapsack measurements (see that
@@ -50,6 +53,28 @@ jobs:
           {
             echo "## Code coverage"
             bun scripts/coverage-summary.ts coverage/lcov.info
+          } >> "$GITHUB_STEP_SUMMARY"
+      # Gate: total coverage never decreases (ratchet vs the base), and
+      # new src/ code is >= 80% covered. The base's coverage comes from
+      # running the same suite on the merge-base (PRs) / parent commit
+      # (pushes) in a worktree — stateless, no stored baseline to drift.
+      - name: Coverage gate
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            git fetch --no-tags origin main
+            BASE=$(git merge-base HEAD origin/main)
+          else
+            BASE=HEAD^
+          fi
+          echo "Coverage gate base: $BASE"
+          git worktree add "$RUNNER_TEMP/base" "$BASE"
+          (
+            cd "$RUNNER_TEMP/base"
+            bun install --frozen-lockfile
+            bun test --coverage --coverage-reporter=lcov --coverage-dir=coverage
+          )
+          {
+            bun scripts/coverage-gate.ts coverage/lcov.info "$RUNNER_TEMP/base/coverage/lcov.info" "$BASE"
           } >> "$GITHUB_STEP_SUMMARY"
       # v3 default surface is the job summary on the run page; on failure
       # it also annotates the offending files/lines.

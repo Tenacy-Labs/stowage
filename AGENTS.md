@@ -19,6 +19,8 @@ Hooks live in `.githooks/` (version-controlled); the `core.hooksPath` line above
 
 `tsc` is invoked through bun — plain `bunx tsc` misbehaves on some hosts. Bypass is `--no-verify`; don't — CI runs the same gates.
 
+CI additionally gates coverage (`scripts/coverage-gate.ts`): total line coverage must not decrease vs the base, and new `src/` lines must be ≥ 80% covered (files never loaded by tests count as fully uncovered).
+
 Also: `bun run bench/relief-dp.ts` — relief-DP wall measurement.
 
 ## Repo facts
