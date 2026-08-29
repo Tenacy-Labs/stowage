@@ -26,6 +26,11 @@ jobs:
       - id: release
         uses: googleapis/release-please-action@v5
         with:
+          # PAT (RELEASE_PLEASE_TOKEN) makes release-please's PRs run CI
+          # normally; GITHUB_TOKEN-authored PRs get their workflows stuck
+          # at action_required, which required checks can never satisfy.
+          # Fallback keeps the old behavior until the secret exists.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
