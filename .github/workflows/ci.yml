@@ -105,7 +105,7 @@ jobs:
         run: bun bench/relief-dp.ts --json > bench.json
       - name: Restore PR bench history
         if: github.event_name == 'pull_request'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ./cache
           key: benchmark-data-${{ runner.os }}
